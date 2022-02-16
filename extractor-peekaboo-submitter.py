@@ -15,6 +15,10 @@ class PeekabooSubmitter(karton.core.Karton):
         {
             "type": "sample",
             "stage": "recognized"
+        },
+        {
+            "type": "sample",
+            "stage": "unrecognized"
         }
     ]
 
