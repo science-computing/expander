@@ -277,6 +277,11 @@ class ExtractorAPI:
 
         report_key = EXTRACTOR_JOB_REPORT + str(job_id)
         report_json = self.karton.backend.redis.get(report_key)
+        if not report_json:
+            logger.debug('No analysis result yet for job %s', job_id)
+            return sanic.response.json(
+                {'message': 'No analysis result yet for job %s' % job_id}, 404)
+
         report = json.loads(report_json)
 
         # apply schema here
