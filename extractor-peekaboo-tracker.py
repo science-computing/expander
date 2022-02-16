@@ -90,6 +90,9 @@ class ExtractorPeekabooTracker(karton.core.Karton):
                 "result": "bad",
                 "reason": "because",
                 "report": "yessir",
+                "file-name": task.payload.get("file-name"),
+                "content-type": task.payload.get("content-type"),
+                "content-disposition": task.payload.get("content-disposition"),
             })
 
         self.send_task(report_task)

@@ -40,6 +40,9 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         self.results = dict()
         self.reasons = dict()
         self.reports = dict()
+        self.file_names = dict()
+        self.content_types = dict()
+        self.content_dispositions = dict()
 
         identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(job_id)
 
@@ -58,6 +61,9 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         self.results[peekaboo_job_id] = task.payload.get("result")
         self.reasons[peekaboo_job_id] = task.payload.get("reason")
         self.reports[peekaboo_job_id] = task.payload.get("report")
+        self.file_names[peekaboo_job_id] = task.payload.get("file-name")
+        self.content_types[peekaboo_job_id] = task.payload.get("conten-type")
+        self.content_dispositions[peekaboo_job_id] = task.payload.get("content-disposition")
 
     def correlate(self) -> dict:
         """
@@ -115,6 +121,9 @@ class ExtractorJobCorrelator(karton.core.Consumer):
                 report["jobs"][job_id_str]["result"] = self.results[job_id]
                 report["jobs"][job_id_str]["reason"] = self.reasons[job_id]
                 report["jobs"][job_id_str]["report"] = self.reports[job_id]
+                report["jobs"][job_id_str]["file-name"] = self.file_names[job_id]
+                report["jobs"][job_id_str]["content-type"] = self.content_types[job_id]
+                report["jobs"][job_id_str]["content-disposition"] = self.content_dispositions[job_id]
         
         report_key = EXTRACTOR_JOB_REPORT + str(self.job_id)
         self.backend.redis.set(report_key, json.dumps(job_info))
