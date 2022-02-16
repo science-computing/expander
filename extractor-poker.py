@@ -230,6 +230,7 @@ class ExtractorPoker(karton.core.Karton):
 
             # all jobs tracked and reported - poke the correlator
             if jobs_left <= 0:
+                self.backend.redis.hdel(EXTRACTOR_PEEKABOO_JOBS, task.root_uid)
                 task = karton.core.Task(
                     headers={"type": "extractor-correlator-poke"},
                     payload={})
