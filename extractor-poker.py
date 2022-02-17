@@ -15,8 +15,8 @@ config = karton.core.Config(sys.argv[1])
 class DelayedTask(karton.core.Task):
     def __init__(self, headers, payload=None, payload_persistent=None,
                  priority=None, parent_uid=None, root_uid=None,
-                 orig_uid=None, uid=None, last_update=None, error=None,
-                 delay_filters=None):
+                 orig_uid=None, uid=None, last_update=None, status=None,
+                 error=None, delay_filters=None):
         """ Allow transfer of last_update and addition of additional filters to
         match. """
         super().__init__(
@@ -26,6 +26,8 @@ class DelayedTask(karton.core.Task):
 
         if last_update is not None:
             self.last_update = last_update
+        if status is not None:
+            self.status = status
 
         self.delay_filters = delay_filters
 
@@ -74,6 +76,7 @@ class NonBlockingKartonBackend(karton.core.backend.KartonBackend):
             root_uid=task.root_uid,
             uid=task.uid,
             last_update=task.last_update,
+            status=task.status,
             delay_filters=self.delay_filters
         )
 
