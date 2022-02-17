@@ -24,7 +24,8 @@ class PeekabooSubmitter(karton.core.Karton):
     def process(self, task: karton.core.Task) -> None:
         sample = task.get_resource("sample")
         if task.headers.get("kind") == "archive":
-            print("Ignoring archive %s", sample.name)
+            self.log.info(
+                "%s: Ignoring archive %s", task.root_uid, sample.name)
             return
 
         content_type = task.payload.get('content-type')

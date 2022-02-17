@@ -178,7 +178,7 @@ class ExtractorPoker(karton.core.Karton):
             task = task.derive_task(headers)
             self.send_task(task)
             self.log.info(
-                    "%s:%s: Initially poked Peekaboo job tracker (%s)",
+                "%s:%s: Initially poked Peekaboo job tracker (%s)",
                 task.root_uid, peekaboo_job_id, task.uid)
             return
 
@@ -241,7 +241,8 @@ class ExtractorPoker(karton.core.Karton):
             return
 
         self.log.warning(
-            "Ignoring task %s with unknown state %s", task.uid, state)
+            "%s:%s: Ignoring task %s with unknown state %s",
+            task.root_uid, peekaboo_job_id, task.uid, state)
 
     def poke(self) -> None:
         self.log.info("Service %s started", self.identity)
