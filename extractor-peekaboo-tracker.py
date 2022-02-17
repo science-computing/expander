@@ -98,6 +98,9 @@ class ExtractorPeekabooTracker(karton.core.Karton):
             "%s:%s: Submitted report (%s)",
             task.root_uid, peekaboo_job_id, report_task.uid)
 
+        # do not do lengthy processing down here because it aggravates a race
+        # condition with the all-jobs-finished check in the poker
+
 
 if __name__ == "__main__":
     c = ExtractorPeekabooTracker(config)

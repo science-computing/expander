@@ -53,6 +53,9 @@ class PeekabooSubmitter(karton.core.Karton):
             "content-dispostion %s (%s)", task.root_uid, peekaboo_job_id,
             sample.name, content_type, content_disposition, poker_task.uid)
 
+        # do not do lengthy processing down here because it aggravates a race
+        # condition with the all-jobs-finished check in the poker
+
 
 if __name__ == "__main__":
     c = PeekabooSubmitter(config)
