@@ -251,9 +251,14 @@ class ExtractorAPI:
             headers={"type": "sample", "kind": "raw"},
             payload={
                 "sample": resource,
-                "content-type": content_type,
-                "content-disposition": content_disposition,
             })
+
+        # do not use persistent payload here because they loose their meaning
+        # for additional samples extracted from this, e.g. archives
+        if content_type is not None:
+            task.add_payload("content-type", content_type)
+        if content_disposition is not None:
+            task.add_payload("content-disposition", content_disposition)
 
         self.karton.send_task(task)
 

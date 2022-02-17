@@ -22,7 +22,7 @@ class ExtractorPeekabooTracker(karton.core.Karton):
     ]
 
     def process(self, task: karton.core.Task) -> None:
-        peekaboo_job_id = uuid.UUID(task.payload.get("peekaboo-job-id"))
+        peekaboo_job_id = uuid.UUID(task.get_payload("peekaboo-job-id"))
 
         # tracked ;)
         if random.randint(0, 2):
@@ -43,10 +43,10 @@ class ExtractorPeekabooTracker(karton.core.Karton):
             headers={
                 "type": "peekaboo-job",
                 "state": "done",
-            },
-            payload={
-                "peekaboo-job-id": str(peekaboo_job_id)
             })
+
+        # metadata from persistent payload (job id, file-name) is added
+        # automatically here
         self.send_task(done_task)
         self.log.info(
             "%s:%s: Told poker that it's done (%s)",
@@ -84,15 +84,12 @@ class ExtractorPeekabooTracker(karton.core.Karton):
         report_task = karton.core.Task(
             headers=headers,
             payload={
-                "peekaboo-job-id": str(peekaboo_job_id),
                 "result": "bad",
                 "reason": "because",
                 "report": "yessir",
-                "file-name": task.payload.get("file-name"),
-                "content-type": task.payload.get("content-type"),
-                "content-disposition": task.payload.get("content-disposition"),
             })
 
+        # metadata from persistent payload is added automatically here
         self.send_task(report_task)
         self.log.info(
             "%s:%s: Submitted report (%s)",

@@ -157,7 +157,7 @@ class ExtractorPoker(karton.core.Karton):
                 "Ignoring task %s without state: %s", task.uid, task.headers)
             return
 
-        peekaboo_job_id = task.payload.get("peekaboo-job-id")
+        peekaboo_job_id = task.get_payload("peekaboo-job-id")
         if peekaboo_job_id is None:
             self.log.warning(
                 "Ignoring task %s without Peekaboo job ID: %s",
@@ -340,8 +340,7 @@ class ExtractorPoker(karton.core.Karton):
             # all jobs tracked and reported - poke the correlator
             self.backend.redis.hdel(EXTRACTOR_PEEKABOO_JOBS, task.root_uid)
             task = karton.core.Task(
-                headers={"type": "extractor-correlator-poke"},
-                payload={})
+                headers={"type": "extractor-correlator-poke"})
             self.send_task(task)
 
             self.log.info(

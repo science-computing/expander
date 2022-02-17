@@ -36,12 +36,7 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         ]
 
         # in-memory state :( short-lived at least - could also be in redis instead
-        self.results = dict()
-        self.reasons = dict()
-        self.reports = dict()
-        self.file_names = dict()
-        self.content_types = dict()
-        self.content_dispositions = dict()
+        self.jobs = {}
 
         identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(job_id)
 
@@ -54,15 +49,18 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         self._post_hooks = []
 
     def process(self, task: karton.core.Task) -> None:
-        peekaboo_job_id = uuid.UUID(task.payload.get("peekaboo-job-id"))
+        peekaboo_job_id = uuid.UUID(task.get_payload("peekaboo-job-id"))
         self.log.info("%s:%s: Correlating.", self.job_id, peekaboo_job_id)
 
-        self.results[peekaboo_job_id] = task.payload.get("result")
-        self.reasons[peekaboo_job_id] = task.payload.get("reason")
-        self.reports[peekaboo_job_id] = task.payload.get("report")
-        self.file_names[peekaboo_job_id] = task.payload.get("file-name")
-        self.content_types[peekaboo_job_id] = task.payload.get("conten-type")
-        self.content_dispositions[peekaboo_job_id] = task.payload.get("content-disposition")
+        # do more schema checking here
+
+        job = self.jobs[str(peekaboo_job_id)] = {}
+        for datum in [
+                "result", "reason", "report", "file-name", "content-type",
+                "content-disposition"]:
+            value = task.get_payload(datum)
+            if value is not None:
+                job[datum] = value
 
     def correlate(self) -> dict:
         """
@@ -80,11 +78,14 @@ class ExtractorJobCorrelator(karton.core.Consumer):
             self.internal_process(task)
 
         # pick worst
-        jobs_by_results = dict()
-        for job_id in self.results.keys():
-            result = self.results[job_id]
+        jobs_by_results = {}
+        for job_id, job in self.jobs.items():
+            result = job.get("result")
+            if result is None:
+                continue
+
             if jobs_by_results.get(result) is None:
-                jobs_by_results[result] = list()
+                jobs_by_results[result] = []
 
             jobs_by_results[result].append(job_id)
 
@@ -106,23 +107,15 @@ class ExtractorJobCorrelator(karton.core.Consumer):
 
         # unknown result!?
         if worst_job is not None:
-            job_info = dict()
+            job_info = {}
             job_info["result"] = overall_result
-            job_info["reason"] = self.reasons[worst_job]
-            job_info["report"] = dict()
+            reason = self.jobs[worst_job].get("reason")
+            if reason is not None:
+                job_info["reason"] = reason
 
-            report = job_info["report"]
-            report["id-of-worst-job"] = str(worst_job)
-            report["jobs"] = dict()
-            for job_id in self.results.keys():
-                job_id_str = str(job_id)
-                report["jobs"][job_id_str] = dict()
-                report["jobs"][job_id_str]["result"] = self.results[job_id]
-                report["jobs"][job_id_str]["reason"] = self.reasons[job_id]
-                report["jobs"][job_id_str]["report"] = self.reports[job_id]
-                report["jobs"][job_id_str]["file-name"] = self.file_names[job_id]
-                report["jobs"][job_id_str]["content-type"] = self.content_types[job_id]
-                report["jobs"][job_id_str]["content-disposition"] = self.content_dispositions[job_id]
+            report = job_info["report"] = {}
+            report["id-of-worst-job"] = worst_job
+            report["jobs"] = self.jobs
         
         report_key = EXTRACTOR_JOB_REPORT + str(self.job_id)
         self.backend.redis.set(report_key, json.dumps(job_info))

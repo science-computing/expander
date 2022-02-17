@@ -28,8 +28,9 @@ class PeekabooSubmitter(karton.core.Karton):
                 "%s: Ignoring archive %s", task.root_uid, sample.name)
             return
 
-        content_type = task.payload.get('content-type')
-        content_disposition = task.payload.get('content-disposition')
+        file_name = sample.name
+        content_type = task.get_payload("content-type")
+        content_disposition = task.get_payload("content-disposition")
 
         # submitted ;)
         peekaboo_job_id = str(uuid.uuid4())
@@ -40,18 +41,26 @@ class PeekabooSubmitter(karton.core.Karton):
                 "type": "peekaboo-job",
                 "state": "new",
             },
-            payload={
+            payload_persistent={
                 "peekaboo-job-id": str(peekaboo_job_id),
-                "file-name": sample.name,
-                "content-type": content_type,
-                "content-disposition": content_disposition,
             })
+
+        # add metadata if we have it and make it persistent
+        if file_name is not None:
+            poker_task.add_payload("file-name", file_name, persistent=True)
+        if content_type is not None:
+            poker_task.add_payload(
+                "content-type", content_type, persistent=True)
+        if content_disposition is not None:
+            poker_task.add_payload(
+                "content-disposition", content_disposition, persistent=True)
+
         self.send_task(poker_task)
 
         self.log.info(
             "%s:%s: Submitted with file-name %s, content-type %s and "
             "content-dispostion %s (%s)", task.root_uid, peekaboo_job_id,
-            sample.name, content_type, content_disposition, poker_task.uid)
+            file_name, content_type, content_disposition, poker_task.uid)
 
         # do not do lengthy processing down here because it aggravates a race
         # condition with the all-jobs-finished check in the poker
