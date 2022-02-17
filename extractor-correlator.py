@@ -1,7 +1,6 @@
 #!/home/michael/karton-venv/bin/python3
 
 import json
-import logging
 import sys
 import uuid
 

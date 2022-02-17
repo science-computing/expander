@@ -1,9 +1,7 @@
 #!/home/michael/karton-venv/bin/python3
 
-import logging
 import random
 import sys
-import time
 import uuid
 
 import karton.core
