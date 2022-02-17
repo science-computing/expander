@@ -57,7 +57,7 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         job = self.jobs[str(peekaboo_job_id)] = {}
         for datum in [
                 "result", "reason", "report", "file-name", "content-type",
-                "content-disposition"]:
+                "content-disposition", "extraction-level", "extracted-from"]:
             value = task.get_payload(datum)
             if value is not None:
                 job[datum] = value

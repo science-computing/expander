@@ -55,6 +55,14 @@ class PeekabooSubmitter(karton.core.Karton):
             poker_task.add_payload(
                 "content-disposition", content_disposition, persistent=True)
 
+        extraction_level = task.get_payload("extraction_level")
+        parent = task.get_payload("parent")
+        if extraction_level is not None and parent is not None:
+            poker_task.add_payload(
+                "extraction-level", extraction_level, persistent=True)
+            poker_task.add_payload(
+                "extracted-from", parent.name, persistent=True)
+
         self.send_task(poker_task)
 
         self.log.info(
