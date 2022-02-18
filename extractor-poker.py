@@ -3,6 +3,7 @@
 import datetime
 import sys
 import time
+import uuid
 
 import karton
 import karton.core
@@ -157,7 +158,10 @@ class ExtractorPoker(karton.core.Karton):
                 "Ignoring task %s without state: %s", task.uid, task.headers)
             return
 
-        peekaboo_job_id = task.get_payload("peekaboo-job-id")
+        peekaboo_job_id = None
+        peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
+        if peekaboo_job_id_payload is not None:
+            peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
         if peekaboo_job_id is None:
             self.log.warning(
                 "Ignoring task %s without Peekaboo job ID: %s",
@@ -184,7 +188,7 @@ class ExtractorPoker(karton.core.Karton):
             # also remember when we saw it first
             now = datetime.datetime.now(datetime.timezone.utc)
             first = now.isoformat()
-            self.backend.redis.hset(peekaboo_job_hash, peekaboo_job_id, first)
+            self.backend.redis.hset(peekaboo_job_hash, str(peekaboo_job_id), first)
 
             # pass on to tracker, leave headers above as-is
             task = task.derive_task(headers)
@@ -196,7 +200,7 @@ class ExtractorPoker(karton.core.Karton):
 
         if state == "delayed":
             last_string = self.backend.redis.hget(
-                peekaboo_job_hash, peekaboo_job_id)
+                peekaboo_job_hash, str(peekaboo_job_id))
             if not last_string:
                 self.log.warning(
                     "%s:%s: Ignoring delayed Peekaboo job we've apparently "
@@ -219,7 +223,7 @@ class ExtractorPoker(karton.core.Karton):
                 # potential next delay
                 updated_last = now.isoformat()
                 self.backend.redis.hset(
-                    peekaboo_job_hash, peekaboo_job_id, updated_last)
+                    peekaboo_job_hash, str(peekaboo_job_id), updated_last)
                 self.log.info(
                     "%s:%s: Poking Peekaboo job tracker",
                     task.root_uid, peekaboo_job_id)
@@ -230,7 +234,8 @@ class ExtractorPoker(karton.core.Karton):
 
         if state in ["done", "done-recheck"]:
             # clean up
-            if self.backend.redis.hdel(peekaboo_job_hash, peekaboo_job_id):
+            if peekaboo_job_id is not None and self.backend.redis.hdel(
+                    peekaboo_job_hash, str(peekaboo_job_id)):
                 # may have been removed by an ealier done message and we're now
                 # doing rechecks and do not want to spam the log
                 self.log.info(
