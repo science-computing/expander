@@ -23,19 +23,24 @@ class ExtractorPeekabooTracker(karton.core.Karton):
 
     def process(self, task: karton.core.Task) -> None:
         peekaboo_job_id = None
-        peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
-        if peekaboo_job_id_payload is not None:
-            peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
-
         report_payload = {}
-        if peekaboo_job_id is None:
+        job_state = task.get_payload("job-state")
+        if job_state == "submit-failed":
             # submit to peekaboo had failed :(
             report_payload["result"] = "failed"
             reason = task.get_payload("failure-reason")
             if reason is not None:
                 report_payload[
                     "reason"] = f"submit to peekaboo failed: {reason}"
+        elif job_state == "archive-ignored":
+            # no job was submitted because the sample was ignored
+            report_payload["result"] = "ignored"
+            report_payload["reason"] = "archive was ignored"
         else:
+            peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
+            if peekaboo_job_id_payload is not None:
+                peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
+
             # tracked ;)
             if random.randint(0, 2):
                 # not done yet - bounce back to the poker

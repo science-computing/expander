@@ -24,26 +24,9 @@ class PeekabooSubmitter(karton.core.Karton):
 
     def process(self, task: karton.core.Task) -> None:
         sample = task.get_resource("sample")
-        if task.headers.get("kind") == "archive":
-            self.log.info(
-                "%s: Ignoring archive %s", task.root_uid, sample.name)
-            return
-
         file_name = sample.name
         content_type = task.get_payload("content-type")
         content_disposition = task.get_payload("content-disposition")
-
-        # None marks failed submit (or should we have a separate submit failed
-        # state?)
-        peekaboo_job_id = None
-        if random.randint(0, 10):
-            # submitted ;)
-            peekaboo_job_id = str(uuid.uuid4())
-        else:
-            failure_reason = [
-                "host unreachable",
-                "connection refused",
-                "internal server error"][random.randint(0, 2)]
 
         # submit a first tracker poker task
         poker_task = karton.core.Task(
@@ -52,14 +35,42 @@ class PeekabooSubmitter(karton.core.Karton):
                 "state": "new",
             })
 
-        if peekaboo_job_id is not None:
-            poker_task.add_payload(
-                "peekaboo-job-id", peekaboo_job_id, persistent=True)
+        sample_kind = task.headers.get("kind")
+        if sample_kind == "archive":
+            self.log.info(
+                "%s: Ignoring archive %s", task.root_uid, file_name)
 
-        if peekaboo_job_id is None:
-            poker_task.add_payload(
-                "failure-reason", f"submit failed: {failure_reason}",
-                persistent=True)
+            # no job ID payload but additional status to distinguish
+            # reasons for missing job ID, job-state vs. task state(!)
+            poker_task.add_payload("job-state", "archive-ignored")
+        else:
+            if random.randint(0, 10):
+                # submitted ;)
+                peekaboo_job_id = str(uuid.uuid4())
+
+                self.log.info(
+                    "%s:%s: Submitted with file-name %s, content-type %s and "
+                    "content-dispostion %s", task.root_uid, peekaboo_job_id,
+                    file_name, content_type, content_disposition)
+
+                poker_task.add_payload("job-state", "submitted")
+                poker_task.add_payload(
+                    "peekaboo-job-id", peekaboo_job_id, persistent=True)
+            else:
+                failure_reason = [
+                    "host unreachable",
+                    "connection refused",
+                    "internal server error"][random.randint(0, 2)]
+
+                self.log.info(
+                    "%s: Submit of file with name %s, content-type %s and "
+                    "content-dispostion %s failed: %s", task.root_uid,
+                    file_name, content_type, content_disposition,
+                    failure_reason)
+
+                poker_task.add_payload("job-state", "submit-failed")
+                poker_task.add_payload(
+                    "failure-reason", failure_reason, persistent=True)
 
         # add metadata if we have it and make it persistent
         if file_name is not None:
@@ -80,18 +91,6 @@ class PeekabooSubmitter(karton.core.Karton):
                 "extracted-from", parent.name, persistent=True)
 
         self.send_task(poker_task)
-
-        if peekaboo_job_id is None:
-            self.log.info(
-                "%s: Submit of file with name %s, content-type %s and "
-                "content-dispostion %s failed: %s (%s)", task.root_uid,
-                file_name, content_type, content_disposition, failure_reason,
-                poker_task.uid)
-        else:
-            self.log.info(
-                "%s:%s: Submitted with file-name %s, content-type %s and "
-                "content-dispostion %s (%s)", task.root_uid, peekaboo_job_id,
-                file_name, content_type, content_disposition, poker_task.uid)
 
         # do not do lengthy processing down here because it aggravates a race
         # condition with the all-jobs-finished check in the poker
