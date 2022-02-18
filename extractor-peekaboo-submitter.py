@@ -95,6 +95,8 @@ class PeekabooSubmitter(karton.core.Karton):
             poker_task.add_payload(
                 "root-sample", root_sample, persistent=True)
 
+        poker_task.add_payload("sha256", sample.sha256, persistent=True)
+
         self.send_task(poker_task)
 
         # do not do lengthy processing down here because it aggravates a race

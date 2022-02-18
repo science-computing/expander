@@ -67,7 +67,7 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         for datum in [
                 "result", "reason", "report", "file-name", "content-type",
                 "content-disposition", "extraction-level", "extracted-from",
-                "root-sample"]:
+                "root-sample", "sha256"]:
             value = task.get_payload(datum)
             if value is not None:
                 job[datum] = value
