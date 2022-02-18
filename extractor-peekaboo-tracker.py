@@ -22,21 +22,59 @@ class ExtractorPeekabooTracker(karton.core.Karton):
     ]
 
     def process(self, task: karton.core.Task) -> None:
-        peekaboo_job_id = uuid.UUID(task.get_payload("peekaboo-job-id"))
+        peekaboo_job_id = None
+        peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
+        if peekaboo_job_id_payload is not None:
+            peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
 
-        # tracked ;)
-        if random.randint(0, 2):
-            # bounce back to the poker
-            delay_task = task.derive_task({
-                "type": "peekaboo-job",
-                "state": "delayed",
-                "delay-queue": task.headers.get("delay-queue"),
-            })
-            self.send_task(delay_task)
-            self.log.info(
-                "%s:%s: Told poker that it needs more tracking (%s)",
-                task.root_uid, peekaboo_job_id, delay_task.uid)
-            return
+        report_payload = {}
+        if peekaboo_job_id is None:
+            # submit to peekaboo had failed :(
+            report_payload["result"] = "failed"
+            reason = task.get_payload("failure-reason")
+            if reason is not None:
+                report_payload[
+                    "reason"] = f"submit to peekaboo failed: {reason}"
+        else:
+            # tracked ;)
+            if random.randint(0, 2):
+                # not done yet - bounce back to the poker
+                delay_task = task.derive_task({
+                    "type": "peekaboo-job",
+                    "state": "delayed",
+                    "delay-queue": task.headers.get("delay-queue"),
+                })
+                self.send_task(delay_task)
+                self.log.info(
+                    "%s:%s: Told poker that it needs more tracking (%s)",
+                    task.root_uid, peekaboo_job_id, delay_task.uid)
+                return
+
+            if random.randint(0, 3):
+                # finished normally
+                report_payload["result"] = [
+                    "bad", "ignored", "unknown"][random.randint(0, 2)]
+                report_payload["reason"] = "because"
+                report_payload["report"] = ["yessir"]
+            else:
+                if random.randint(0, 2):
+                    # job failed inside Peekaboo :(
+                    error = [
+                        "submit to cuckoo failed",
+                        "cuckoo job too old"][random.randint(0, 1)]
+
+                    report_payload["result"] = "failed"
+                    report_payload["reason"] = f"Peekaboo job failed: {error}"
+                else:
+                    # tacking failed :(
+                    error = [
+                        "host unreachable",
+                        "connection refused",
+                        "internal server error"][random.randint(0, 2)]
+
+                    report_payload["result"] = "failed"
+                    report_payload[
+                        "reason"] = f"Tracking Peekaboo job failed: {error}"
 
         # notify poker that this job is done and needs no more poking
         done_task = karton.core.Task(
@@ -83,11 +121,7 @@ class ExtractorPeekabooTracker(karton.core.Karton):
 
         report_task = karton.core.Task(
             headers=headers,
-            payload={
-                "result": "bad",
-                "reason": "because",
-                "report": "yessir",
-            })
+            payload=report_payload)
 
         # metadata from persistent payload is added automatically here
         self.send_task(report_task)

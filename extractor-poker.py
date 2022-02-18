@@ -162,11 +162,6 @@ class ExtractorPoker(karton.core.Karton):
         peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
         if peekaboo_job_id_payload is not None:
             peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
-        if peekaboo_job_id is None:
-            self.log.warning(
-                "Ignoring task %s without Peekaboo job ID: %s",
-                task.uid, task.headers)
-            return
 
         peekaboo_job_hash = EXTRACTOR_PEEKABOO_PER_JOB + str(task.root_uid)
 
@@ -185,10 +180,13 @@ class ExtractorPoker(karton.core.Karton):
             self.backend.redis.hincrby(
                 EXTRACTOR_PEEKABOO_JOBS, task.root_uid, 1)
 
-            # also remember when we saw it first
-            now = datetime.datetime.now(datetime.timezone.utc)
-            first = now.isoformat()
-            self.backend.redis.hset(peekaboo_job_hash, str(peekaboo_job_id), first)
+            # new jobs may have no job id if submit failed
+            if peekaboo_job_id is not None:
+                # also remember when we saw it first
+                now = datetime.datetime.now(datetime.timezone.utc)
+                first = now.isoformat()
+                self.backend.redis.hset(
+                    peekaboo_job_hash, str(peekaboo_job_id), first)
 
             # pass on to tracker, leave headers above as-is
             task = task.derive_task(headers)
@@ -199,6 +197,12 @@ class ExtractorPoker(karton.core.Karton):
             return
 
         if state == "delayed":
+            if peekaboo_job_id is None:
+                self.log.warning(
+                    "Ignoring delay task %s without Peekaboo job ID: %s",
+                    task.uid, task.headers)
+                return
+
             last_string = self.backend.redis.hget(
                 peekaboo_job_hash, str(peekaboo_job_id))
             if not last_string:

@@ -36,7 +36,7 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         ]
 
         # in-memory state :( short-lived at least - could also be in redis instead
-        self.jobs = {}
+        self.jobs = []
 
         identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(job_id)
 
@@ -49,12 +49,21 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         self._post_hooks = []
 
     def process(self, task: karton.core.Task) -> None:
-        peekaboo_job_id = uuid.UUID(task.get_payload("peekaboo-job-id"))
+        peekaboo_job_id = None
+        peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
+        if peekaboo_job_id_payload is not None:
+            peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
+
         self.log.info("%s:%s: Correlating.", self.job_id, peekaboo_job_id)
 
         # do more schema checking here
 
-        job = self.jobs[str(peekaboo_job_id)] = {}
+        job = {}
+        self.jobs.append(job)
+
+        if peekaboo_job_id is not None:
+            job["id"] = str(peekaboo_job_id)
+
         for datum in [
                 "result", "reason", "report", "file-name", "content-type",
                 "content-disposition", "extraction-level", "extracted-from"]:
@@ -77,27 +86,28 @@ class ExtractorJobCorrelator(karton.core.Consumer):
 
             self.internal_process(task)
 
-        # pick worst
         jobs_by_results = {}
-        for job_id, job in self.jobs.items():
+        for job in self.jobs:
             result = job.get("result")
             if result is None:
-                continue
+                # consider jobs without result as failed
+                result = "failed"
 
             if jobs_by_results.get(result) is None:
                 jobs_by_results[result] = []
 
-            jobs_by_results[result].append(job_id)
+            jobs_by_results[result].append(job)
 
+        # pick worst
         overall_result = None
         worst_job = None
         for result in ["bad", "failed", "good", "ignored", "unchecked", "unknown"]:
-            job_ids = jobs_by_results.get(result)
+            jobs = jobs_by_results.get(result)
 
             # can be None or potentially empty list
-            if job_ids:
+            if jobs:
                 overall_result = result
-                worst_job = job_ids[0]
+                worst_job = jobs[0]
                 break
 
         job_info = dict(
@@ -109,12 +119,12 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         if worst_job is not None:
             job_info = {}
             job_info["result"] = overall_result
-            reason = self.jobs[worst_job].get("reason")
+            reason = worst_job.get("reason")
             if reason is not None:
                 job_info["reason"] = reason
 
             report = job_info["report"] = {}
-            report["id-of-worst-job"] = worst_job
+            report["worst-job"] = worst_job
             report["jobs"] = self.jobs
         
         report_key = EXTRACTOR_JOB_REPORT + str(self.job_id)
