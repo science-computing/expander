@@ -90,6 +90,11 @@ class PeekabooSubmitter(karton.core.Karton):
             poker_task.add_payload(
                 "extracted-from", parent.name, persistent=True)
 
+        root_sample = task.get_payload("root-sample")
+        if root_sample is not None:
+            poker_task.add_payload(
+                "root-sample", root_sample, persistent=True)
+
         self.send_task(poker_task)
 
         # do not do lengthy processing down here because it aggravates a race

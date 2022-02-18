@@ -251,6 +251,7 @@ class ExtractorAPI:
             headers={"type": "sample", "kind": "raw"},
             payload={
                 "sample": resource,
+                "root-sample": True,
             })
 
         # do not use persistent payload here because they loose their meaning
