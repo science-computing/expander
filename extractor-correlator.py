@@ -1,5 +1,6 @@
 #!/home/michael/karton-venv/bin/python3
 
+import datetime
 import json
 import sys
 import uuid
@@ -9,6 +10,7 @@ import karton.core.backend
 import karton.core.base
 
 EXTRACTOR_JOB_REPORT = "extractor.report:"
+EXTRACTOR_JOB_CACHE = "extractor.cache:"
 
 EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
 
@@ -37,6 +39,9 @@ class ExtractorJobCorrelator(karton.core.Consumer):
 
         # in-memory state :( short-lived at least - could also be in redis instead
         self.jobs = []
+
+        # cache key
+        self.root_sample_sha256 = None
 
         identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(job_id)
 
@@ -71,6 +76,10 @@ class ExtractorJobCorrelator(karton.core.Consumer):
             value = task.get_payload(datum)
             if value is not None:
                 job[datum] = value
+
+        # not None, of type bool and True
+        if job.get("root-sample") is True:
+            self.root_sample_sha256 = job.get("sha256")
 
     def correlate(self) -> dict:
         """
@@ -130,6 +139,16 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         
         report_key = EXTRACTOR_JOB_REPORT + str(self.job_id)
         self.backend.redis.set(report_key, json.dumps(job_info))
+
+        # add to cache
+        if overall_result != "failed" and self.root_sample_sha256 is not None:
+            # extractor.cache:<sha256>[<job_id>] = <hours since epoch (float)>
+            # cache collisions are no big deal because we need only *something*
+            # to be cached not everyhing
+            cache_key = EXTRACTOR_JOB_CACHE + self.root_sample_sha256
+            now = datetime.datetime.now(
+                datetime.timezone.utc).timestamp() / 3600
+            self.backend.redis.zadd(cache_key, {self.job_id: now})
 
         self.log.info("%s: Correlated.", self.job_id)
         self.backend.unregister_bind(self.identity)

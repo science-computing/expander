@@ -19,6 +19,8 @@ import schema
 
 logger = logging.getLogger(__name__)
 
+USE_CACHE = True
+
 EXTRACTOR_JOB_REPORT = "extractor.report:"
 
 class ExtractorAPI:
@@ -247,8 +249,13 @@ class ExtractorAPI:
         @type content_disposition: str
         """
         resource = karton.core.Resource(file_name, content=file_content)
+
+        headers = {"type": "sample", "kind": "raw"}
+        if USE_CACHE:
+            headers = {"type": "extractor-sample"}
+
         task = karton.core.Task(
-            headers={"type": "sample", "kind": "raw"},
+            headers=headers,
             payload={
                 "sample": resource,
                 "root-sample": True,
