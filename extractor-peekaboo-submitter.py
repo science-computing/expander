@@ -5,7 +5,6 @@ import sys
 import uuid
 
 import karton.core
-import karton.core.backend
 
 config = karton.core.Config(sys.argv[1])
 
