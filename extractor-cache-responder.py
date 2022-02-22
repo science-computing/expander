@@ -6,7 +6,7 @@ import sys
 
 import karton.core
 
-EXTRACTOR_JOB_REPORT = "extractor.report:"
+EXTRACTOR_REPORTS = "extractor.reports"
 EXTRACTOR_JOB_CACHE = "extractor.cache:"
 
 config = karton.core.Config(sys.argv[1])
@@ -32,8 +32,13 @@ class PeekabooCacheResponder(karton.core.Karton):
         # extractor.cache:<sha256>[<job_id>] = <hours since epoch (float)>
         cache_key = EXTRACTOR_JOB_CACHE + sha256
         for job_id in self.backend.redis.zrange(cache_key, 0, -1, desc=True):
-            report_key = EXTRACTOR_JOB_REPORT + job_id
-            report_json = self.backend.redis.get(report_key)
+            report_json = self.backend.redis.hget(EXTRACTOR_REPORTS, job_id)
+            if report_json is None:
+                self.log.warning(
+                    "%s: Cache inconsistency, report %s missing",
+                    task.root_uid, job_id)
+                continue
+
             report = json.loads(report_json)
 
             # schema checking
@@ -71,8 +76,8 @@ class PeekabooCacheResponder(karton.core.Karton):
                 continue
 
             # update cache and be done
-            report_key = EXTRACTOR_JOB_REPORT + task.root_uid
-            self.backend.redis.set(report_key, report_json)
+            self.backend.redis.hset(
+                EXTRACTOR_REPORTS, task.root_uid, report_json)
             self.log.info(
                 "%s: Short-circuited with cached report %s",
                 task.root_uid, job_id)

@@ -9,7 +9,7 @@ import karton.core
 import karton.core.backend
 import karton.core.base
 
-EXTRACTOR_JOB_REPORT = "extractor.report:"
+EXTRACTOR_REPORTS = "extractor.reports"
 EXTRACTOR_JOB_CACHE = "extractor.cache:"
 
 EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
@@ -137,8 +137,8 @@ class ExtractorJobCorrelator(karton.core.Consumer):
             report["worst-job"] = worst_job
             report["jobs"] = self.jobs
         
-        report_key = EXTRACTOR_JOB_REPORT + str(self.job_id)
-        self.backend.redis.set(report_key, json.dumps(job_info))
+        self.backend.redis.hset(
+            EXTRACTOR_REPORTS, self.job_id, json.dumps(job_info))
 
         # add to cache
         if overall_result != "failed" and self.root_sample_sha256 is not None:

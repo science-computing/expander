@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 USE_CACHE = True
 
-EXTRACTOR_JOB_REPORT = "extractor.report:"
+EXTRACTOR_REPORTS = "extractor.reports"
 
 class ExtractorAPI:
     def __init__(self, karton_config, host="127.0.0.1", port=8200, request_queue_size=100):
@@ -288,8 +288,8 @@ class ExtractorAPI:
             return sanic.response.json(
                 {'message': 'job ID missing from request'}, 400)
 
-        report_key = EXTRACTOR_JOB_REPORT + str(job_id)
-        report_json = self.karton.backend.redis.get(report_key)
+        report_json = self.karton.backend.redis.hget(
+            EXTRACTOR_REPORTS, str(job_id))
         if not report_json:
             logger.debug('No analysis result yet for job %s', job_id)
             return sanic.response.json(
