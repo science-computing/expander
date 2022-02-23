@@ -6,7 +6,6 @@ import sys
 import uuid
 
 import karton.core
-import karton.core.backend
 import karton.core.base
 
 EXTRACTOR_REPORTS = "extractor.reports"
@@ -16,14 +15,17 @@ EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
 
 config = karton.core.Config(sys.argv[1])
 
+
 class NonBlockingKartonBackend(karton.core.backend.KartonBackend):
-    def consume_queues(self, queues, timeout = 0):
+    def consume_queues(self, queues, timeout=0):
+        """ modified to be non-blocking """
         for queue in queues:
             item = self.redis.lpop(queue)
             if item:
                 return queue, item
 
         return None
+
 
 class ExtractorJobCorrelator(karton.core.Consumer):
     def __init__(self, job_id, config=None, backend=None):

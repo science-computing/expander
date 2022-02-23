@@ -2,12 +2,13 @@
 
 import datetime
 import sys
-import time
 import uuid
 
 import karton
 import karton.core
 import karton.core.task
+
+import common
 
 EXTRACTOR_PEEKABOO_JOBS = "extractor.peekaboo.jobs"
 EXTRACTOR_PEEKABOO_PER_JOB = "extractor.peekaboo.job:"
@@ -18,85 +19,7 @@ RECHECK_CUTOFF = datetime.timedelta(seconds=60)
 config = karton.core.Config(sys.argv[1])
 
 
-class DelayedTask(karton.core.Task):
-    def __init__(self, headers, payload=None, payload_persistent=None,
-                 priority=None, parent_uid=None, root_uid=None,
-                 orig_uid=None, uid=None, last_update=None, status=None,
-                 error=None, delay_filters=None):
-        """ Allow transfer of last_update and addition of additional filters to
-        match. """
-        super().__init__(
-            headers, payload=payload, payload_persistent=payload_persistent,
-            priority=priority, parent_uid=parent_uid, root_uid=root_uid,
-            orig_uid=orig_uid, uid=uid, error=error)
-
-        if last_update is not None:
-            self.last_update = last_update
-        if status is not None:
-            self.status = status
-
-        self.delay_filters = delay_filters
-
-    def matches_filters(self, filters) -> bool:
-        """ modified to include a separate set of delay filters provided by
-        backend """
-        if self.delay_filters is not None:
-            filters = filters.copy()
-            filters.extend(self.delay_filters)
-        
-        return super().matches_filters(filters)
-
-
-class NonBlockingKartonBackend(karton.core.backend.KartonBackend):
-    def __init__(self, config):
-        super().__init__(config)
-        self.delay_filters = None
-        self.delay_identity = None
-
-    def set_delay_identity(self, delay_filters, delay_identity):
-        self.delay_filters = delay_filters
-        self.delay_identity = delay_identity
-
-    def get_queue_names(self, identity):
-        queues = super().get_queue_names(identity)
-
-        if self.delay_identity is not None:
-            queues.extend(super().get_queue_names(self.delay_identity))
-
-        return queues
-
-    def get_task(self, task_uid):
-        """ modified to patch task so it matches main filters and is not
-        rejected """
-        task = super().get_task(task_uid)
-        if task is None:
-            return None
-
-        # see Task.fork_task()
-        return DelayedTask(
-            headers=task.headers,
-            payload=task.payload,
-            payload_persistent=task.payload_persistent,
-            priority=task.priority,
-            parent_uid=task.parent_uid,
-            root_uid=task.root_uid,
-            uid=task.uid,
-            last_update=task.last_update,
-            status=task.status,
-            delay_filters=self.delay_filters
-        )
-
-    def consume_queues(self, queues, timeout = 0):
-        """ modified to be non-blocking """
-        for queue in queues:
-            item = self.redis.lpop(queue)
-            if item:
-                return queue, item
-
-        return None
-
-
-class ExtractorPoker(karton.core.Karton):
+class ExtractorPoker(common.DelayingKarton):
     identity = "extractor.poker"
     filters = [
         {
@@ -109,32 +32,22 @@ class ExtractorPoker(karton.core.Karton):
         }, 
     ]
 
+    delay_filters_template = [
+        {
+            "type": "peekaboo-job",
+            "state": "delayed",
+        }, {
+            "type": "peekaboo-job",
+            "state": "done-recheck",
+        }
+    ]
+
     def __init__(self, config=None, identity=None, backend=None,
                  timeout=1, poking_delay=3):
-        self.timeout = timeout
         self.poking_delay = poking_delay
 
-        super().__init__(config=config, identity=identity, backend=backend)
-
-        # add alternating delay queues later on
-        self.current_delay_queue = 0
-        self.next_delay_queue = 1
-        self.delay_queues = ["one", "two"]
-        self.delay_identity_template = "extractor.poker.delay-%s"
-
-        self.delay_filters = dict()
-        for delay_queue in self.delay_queues:
-            self.delay_filters[delay_queue] = [{
-                "type": "peekaboo-job",
-                "state": "delayed",
-                "delay-queue": delay_queue,
-            }, {
-                "type": "peekaboo-job",
-                "state": "done-recheck",
-                "delay-queue": delay_queue,
-            }]
-
-        self.set_backend_delay_identity()
+        super().__init__(
+            config=config, identity=identity, backend=backend, timeout=timeout)
 
     def set_backend_delay_identity(self):
         delay_queue  = self.delay_queues[self.current_delay_queue]
@@ -361,61 +274,8 @@ class ExtractorPoker(karton.core.Karton):
             "%s:%s: Ignoring task %s with unknown state %s",
             task.root_uid, peekaboo_job_id, task.uid, state)
 
-    def poke(self) -> None:
-        self.log.info("Service %s started", self.identity)
-
-        # Get the old binds and set the new ones atomically
-        old_bind = self.backend.register_bind(self._bind)
-
-        if not old_bind:
-            self.log.info("Service binds created.")
-        elif old_bind != self._bind:
-            self.log.info("Binds changed, old service instances should exit soon.")
-
-        for task_filter in self.filters:
-            self.log.info("Binding on: %s", task_filter)
-
-        self.backend.set_consumer_identity(self.identity)
-
-        # MOD1: add additional identities for delaying tasks
-        for delay_queue in self.delay_queues:
-            filters = self.delay_filters[delay_queue]
-            self.log.info("Binding on delay queue: %s", filters)
-
-            bind = karton.core.backend.KartonBind(
-                identity=self.delay_identity_template % delay_queue,
-                info=f"Poker bind for delayed tasks",
-                version=karton.core.__version__.__version__,
-                filters=filters,
-                persistent=True,
-                service_version=self.__class__.version)
-
-            # make these jobs be queued and routed to us as well
-            self.backend.register_bind(bind)
-
-        try:
-            while not self.shutdown:
-                if self.backend.get_bind(self.identity) != self._bind:
-                    self.log.info("Binds changed, shutting down.")
-                    break
-
-                task = self.backend.consume_routed_task(self.identity)
-                if not task:
-                    # MOD2: do one pass of all available tasks and then update
-                    # the filters and sleep for the polling interval
-                    time.sleep(self.timeout)
-
-                    # switch to next delay queue
-                    self.update_delay_queue()
-                    continue
-
-                self.internal_process(task)
-        except KeyboardInterrupt as e:
-            self.log.info("Hard shutting down!")
-            raise e
-
 
 if __name__ == "__main__":
-    non_blocking_backend = NonBlockingKartonBackend(config)
+    non_blocking_backend = common.NonBlockingDelayingKartonBackend(config)
     c = ExtractorPoker(config, backend=non_blocking_backend)
-    c.poke()
+    c.loop()

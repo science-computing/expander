@@ -20,6 +20,7 @@ import schema
 logger = logging.getLogger(__name__)
 
 USE_CACHE = True
+USE_DEDUPER = True
 
 EXTRACTOR_REPORTS = "extractor.reports"
 
@@ -251,8 +252,8 @@ class ExtractorAPI:
         resource = karton.core.Resource(file_name, content=file_content)
 
         headers = {"type": "sample", "kind": "raw"}
-        if USE_CACHE:
-            headers = {"type": "extractor-sample"}
+        if USE_CACHE or USE_DEDUPER:
+            headers = {"type": "extractor-sample", "state": "new"}
 
         task = karton.core.Task(
             headers=headers,

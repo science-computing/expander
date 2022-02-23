@@ -6,6 +6,8 @@ import sys
 
 import karton.core
 
+USE_DEDUPER = True
+
 EXTRACTOR_REPORTS = "extractor.reports"
 EXTRACTOR_JOB_CACHE = "extractor.cache:"
 
@@ -14,11 +16,24 @@ config = karton.core.Config(sys.argv[1])
 
 class PeekabooCacheResponder(karton.core.Karton):
     identity = "extractor.cache-responder"
-    filters = [
-        {
-            "type": "extractor-sample",
-        }
-    ]
+
+    def __init__(self, config=None, identity=None, backend=None):
+        self.filters = [
+            {
+                "type": "extractor-sample",
+                "state": "new",
+            }
+        ]
+
+        if USE_DEDUPER:
+            self.filters = [
+                {
+                    "type": "extractor-sample",
+                    "state": "deduped",
+                }
+            ]
+
+        super().__init__(config=config, identity=identity, backend=backend)
 
     def process(self, task: karton.core.Task) -> None:
         sample = task.get_resource("sample")
@@ -95,7 +110,6 @@ class PeekabooCacheResponder(karton.core.Karton):
             "type": "sample",
             "kind": "raw",
         })
-
         self.send_task(classifier_task)
         self.log.info("%s: No cache match - passed on", task.root_uid)
 
