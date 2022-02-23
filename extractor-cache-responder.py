@@ -1,6 +1,7 @@
 #!/home/michael/karton-venv/bin/python3
 
 #import datetime
+import hashlib
 import json
 import sys
 
@@ -37,15 +38,29 @@ class PeekabooCacheResponder(karton.core.Karton):
 
     def process(self, task: karton.core.Task) -> None:
         sample = task.get_resource("sample")
+
+        # file name can be None in resource
         file_name = sample.name
+        if file_name is None:
+            file_name = ""
+
         sha256 = sample.sha256
-        content_type = task.get_payload("content-type")
-        content_disposition = task.get_payload("content-disposition")
+        if sha256 is None:
+            # basically impossible but not much code
+            sha256 = hashlib.sha256(sample.content).hexdigest()
+
+        criteria_hash = hashlib.sha256(sha256.encode("ascii"))
+        criteria_hash.update(
+            task.get_payload("content-disposition", "").encode("utf-8"))
+        criteria_hash.update(
+            task.get_payload("content-type", "").encode("utf-8"))
+        criteria_hash.update(file_name.encode("utf-8"))
+        criteria_key = criteria_hash.hexdigest()
 
         # look for an earlier job that processed the same sample with the same
         # parameters, sorted set provides implicit sorting from oldes to newest
         # extractor.cache:<sha256>[<job_id>] = <hours since epoch (float)>
-        cache_key = EXTRACTOR_JOB_CACHE + sha256
+        cache_key = EXTRACTOR_JOB_CACHE + criteria_key
         for job_id in self.backend.redis.zrange(cache_key, 0, -1, desc=True):
             report_json = self.backend.redis.hget(EXTRACTOR_REPORTS, job_id)
             if report_json is None:
@@ -58,41 +73,9 @@ class PeekabooCacheResponder(karton.core.Karton):
 
             # schema checking
 
-            # look for root sample
-            report = report.get("report")
-            if report is None:
-                self.log.debug(
-                    "%s: Cached job %s has no per-job report",
-                    task.root_uid, job_id)
-                continue
-
-            root_sample = None
-            if report.get("worst-sample", {}).get("root-sample") is True:
-                root_sample = report.get("worst-sample")
-            if root_sample is None:
-                for job in report.get("jobs", []):
-                    if job.get("root-sample") is True:
-                        root_sample = job
-
-            if root_sample is None:
-                self.log.debug(
-                    "%s: Cached job %s has no root sample",
-                    task.root_uid, job_id)
-                continue
-
-            if (root_sample.get("sha256") != sha256 or
-                    root_sample.get(
-                        "content-disposition") != content_disposition or
-                    root_sample.get("content-type") != content_type or
-                    root_sample.get("file-name") != file_name):
-                self.log.debug(
-                    "%s: Cached job %s had different parameters for root "
-                    "sample", task.root_uid, job_id)
-                continue
-
             # update cache and be done
             self.backend.redis.hset(
-                EXTRACTOR_REPORTS, task.root_uid, report_json)
+                EXTRACTOR_REPORTS, task.root_uid, json.dumps(report))
             self.log.info(
                 "%s: Short-circuited with cached report %s",
                 task.root_uid, job_id)

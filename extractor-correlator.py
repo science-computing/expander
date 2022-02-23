@@ -1,6 +1,7 @@
 #!/home/michael/karton-venv/bin/python3
 
 import datetime
+import hashlib
 import json
 import sys
 import uuid
@@ -43,7 +44,7 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         self.jobs = []
 
         # cache key
-        self.root_sample_sha256 = None
+        self.cache_criteria_key = None
 
         identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(job_id)
 
@@ -80,8 +81,13 @@ class ExtractorJobCorrelator(karton.core.Consumer):
                 job[datum] = value
 
         # not None, of type bool and True
-        if job.get("root-sample") is True:
-            self.root_sample_sha256 = job.get("sha256")
+        if job.get("root-sample") is True and job.get("sha256"):
+            criteria_hash = hashlib.sha256(job.get("sha256").encode("ascii"))
+            criteria_hash.update(
+                job.get("content-disposition", "").encode("utf-8"))
+            criteria_hash.update(job.get("content-type", "").encode("utf-8"))
+            criteria_hash.update(job.get("file-name", "").encode("utf-8"))
+            self.cache_criteria_key = criteria_hash.hexdigest()
 
     def correlate(self) -> dict:
         """
@@ -143,11 +149,11 @@ class ExtractorJobCorrelator(karton.core.Consumer):
             EXTRACTOR_REPORTS, self.job_id, json.dumps(job_info))
 
         # add to cache
-        if overall_result != "failed" and self.root_sample_sha256 is not None:
+        if overall_result != "failed" and self.cache_criteria_key is not None:
             # extractor.cache:<sha256>[<job_id>] = <hours since epoch (float)>
             # cache collisions are no big deal because we need only *something*
             # to be cached not everyhing
-            cache_key = EXTRACTOR_JOB_CACHE + self.root_sample_sha256
+            cache_key = EXTRACTOR_JOB_CACHE + self.cache_criteria_key
             now = datetime.datetime.now(
                 datetime.timezone.utc).timestamp() / 3600
             self.backend.redis.zadd(cache_key, {self.job_id: now})
