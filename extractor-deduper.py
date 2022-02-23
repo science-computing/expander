@@ -167,7 +167,7 @@ class ExtractorDeduper(common.DelayingKarton):
 
 
 if __name__ == "__main__":
-    non_blocking_backend = common.NonBlockingDelayingKartonBackend(config)
+    non_blocking_backend = common.DelayingKartonBackend(config)
     c = ExtractorDeduper(
         config, backend=non_blocking_backend, timeout=DEDUPE_RECHECK)
     c.loop()

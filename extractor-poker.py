@@ -276,6 +276,6 @@ class ExtractorPoker(common.DelayingKarton):
 
 
 if __name__ == "__main__":
-    non_blocking_backend = common.NonBlockingDelayingKartonBackend(config)
+    non_blocking_backend = common.DelayingKartonBackend(config)
     c = ExtractorPoker(config, backend=non_blocking_backend)
     c.loop()

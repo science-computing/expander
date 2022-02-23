@@ -1,4 +1,4 @@
-import time
+import datetime
 
 import karton.core
 import karton.core.backend
@@ -33,7 +33,7 @@ class DelayedTask(karton.core.Task):
         return super().matches_filters(filters)
 
 
-class NonBlockingDelayingKartonBackend(NonBlockingKartonBackend):
+class DelayingKartonBackend(karton.core.backend.KartonBackend):
     def __init__(self, config):
         super().__init__(config)
         self.delay_filters = None
@@ -144,22 +144,30 @@ class DelayingKarton(karton.core.Karton):
             self.backend.register_bind(bind)
 
         try:
+            last_switch = datetime.datetime.now(datetime.timezone.utc)
+            timeoutdelta = datetime.timedelta(seconds=self.timeout)
             while not self.shutdown:
                 if self.backend.get_bind(self.identity) != self._bind:
                     self.log.info("Binds changed, shutting down.")
                     break
 
-                task = self.backend.consume_routed_task(self.identity)
-                if not task:
-                    # MOD2: do one pass of all available tasks and then update
-                    # the filters and sleep for the polling interval
-                    time.sleep(self.timeout)
+                # MOD2: provide shorter timeout to task dequeue
+                task = self.backend.consume_routed_task(
+                    self.identity, self.timeout)
+                if task:
+                    self.internal_process(task)
 
-                    # switch to next delay queue
+                now = datetime.datetime.now(datetime.timezone.utc)
+                if not task or last_switch + timeoutdelta < now:
+                    # MOD3: switch to next delay queue if blocking dequeue ran
+                    # into timeout. This would leave delayed tasks starving if
+                    # new tasks arrived continuously before the timeout
+                    # expired.  Therefore we independently track the timeout
+                    # between switches.
                     self.update_delay_queue()
+                    last_switch = datetime.datetime.now(datetime.timezone.utc)
                     continue
 
-                self.internal_process(task)
         except KeyboardInterrupt as e:
             self.log.info("Hard shutting down!")
             raise e
