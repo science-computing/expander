@@ -1,16 +1,21 @@
 #!/home/michael/karton-venv/bin/python3
 
-import random
 import sys
-import uuid
+import urllib.parse
 
 import karton.core
 import karton.core.backend
 import karton.core.__version__
+import requests
+import schema
+import urllib3.util
 
 EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
 
+PEEKABOO_URL = "http://127.0.0.1:8100"
+
 config = karton.core.Config(sys.argv[1])
+
 
 class ExtractorPeekabooTracker(karton.core.Karton):
     identity = "extractor.peekaboo-tracker"
@@ -21,65 +26,99 @@ class ExtractorPeekabooTracker(karton.core.Karton):
         }
     ]
 
+    def __init__(self, config=None, identity=None, backend=None):
+        super().__init__(config=config, identity=identity, backend=backend)
+
+        self.url = PEEKABOO_URL
+
+        self.retries = 5
+        self.backoff = 0.5
+
+        retry_config = urllib3.util.Retry(
+            total=self.retries, backoff_factor=self.backoff,
+            allowed_methods=frozenset({"POST"}),
+            status_forcelist=frozenset({413, 429, 500, 503}),
+            raise_on_status=False, raise_on_redirect=False)
+        retry_adapter = requests.adapters.HTTPAdapter(max_retries=retry_config)
+        self.session = requests.session()
+        self.session.mount("http://", retry_adapter)
+        self.session.mount("https://", retry_adapter)
+
+    def track(self, job_id):
+        try:
+            response = self.session.get(urllib.parse.urljoin(
+                self.url, f"/v1/report/{job_id}"))
+        except requests.exceptions.RequestException as error:
+            return None, str(error)
+
+        # no report yet
+        if response.status_code == 404:
+            return None, None
+
+        if response.status_code != 200:
+            try:
+                json_error = schema.Schema({
+                    "message": str,
+                }).validate(response.json())
+                return None, json_error["message"]
+            except (ValueError, schema.SchemaError):
+                return None, str(error)
+
+        try:
+            json = schema.Schema({
+                "result": str,
+                "reason": str,
+                schema.Optional("report"): list,
+            }).validate(response.json())
+        except (ValueError, schema.SchemaError) as error:
+            return None, str(error)
+
+        return json, None
+
     def process(self, task: karton.core.Task) -> None:
         peekaboo_job_id = None
-        report_payload = {}
+        report_payload = None
         job_state = task.get_payload("job-state")
         if job_state == "submit-failed":
             # submit to peekaboo had failed :(
-            report_payload["result"] = "failed"
+            report_payload = {"result": "failed"}
             reason = task.get_payload("failure-reason")
             if reason is not None:
                 report_payload[
                     "reason"] = f"submit to peekaboo failed: {reason}"
         elif job_state == "archive-ignored":
             # no job was submitted because the sample was ignored
-            report_payload["result"] = "ignored"
-            report_payload["reason"] = "archive was ignored"
+            report_payload = {
+                "result": "ignored",
+                "reason": "archive was ignored",
+            }
         else:
-            peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
-            if peekaboo_job_id_payload is not None:
-                peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
-
-            # tracked ;)
-            if random.randint(0, 2):
-                # not done yet - bounce back to the poker
-                delay_task = task.derive_task({
-                    "type": "peekaboo-job",
-                    "state": "delayed",
-                    "delay-queue": task.headers.get("delay-queue"),
-                })
-                self.send_task(delay_task)
-                self.log.info(
-                    "%s:%s: Told poker that it needs more tracking (%s)",
-                    task.root_uid, peekaboo_job_id, delay_task.uid)
+            peekaboo_job_id = task.get_payload("peekaboo-job-id")
+            if not isinstance(peekaboo_job_id, int):
+                self.log.warning(
+                    "%s:%s: Dropping job with missing or invalid Peekaboo "
+                    "job ID", task.root_uid, peekaboo_job_id)
                 return
 
-            if random.randint(0, 3):
-                # finished normally
-                report_payload["result"] = [
-                    "bad", "ignored", "unknown"][random.randint(0, 2)]
-                report_payload["reason"] = "because"
-                report_payload["report"] = ["yessir"]
-            else:
-                if random.randint(0, 2):
-                    # job failed inside Peekaboo :(
-                    error = [
-                        "submit to cuckoo failed",
-                        "cuckoo job too old"][random.randint(0, 1)]
+            report_payload, error = self.track(peekaboo_job_id)
+            if report_payload is None:
+                if error is None:
+                    # not done yet - bounce back to the poker
+                    delay_task = task.derive_task({
+                        "type": "peekaboo-job",
+                        "state": "delayed",
+                        "delay-queue": task.headers.get("delay-queue"),
+                    })
+                    self.send_task(delay_task)
+                    self.log.info(
+                        "%s:%s: Told poker that it needs more tracking (%s)",
+                        task.root_uid, peekaboo_job_id, delay_task.uid)
+                    return
 
-                    report_payload["result"] = "failed"
-                    report_payload["reason"] = f"Peekaboo job failed: {error}"
-                else:
-                    # tacking failed :(
-                    error = [
-                        "host unreachable",
-                        "connection refused",
-                        "internal server error"][random.randint(0, 2)]
-
-                    report_payload["result"] = "failed"
-                    report_payload[
-                        "reason"] = f"Tracking Peekaboo job failed: {error}"
+                report_payload = {
+                    "result": "failed",
+                    "reason": f"Tracking Peekaboo job failed: {error}",
+                }
 
         # notify poker that this job is done and needs no more poking
         done_task = karton.core.Task(

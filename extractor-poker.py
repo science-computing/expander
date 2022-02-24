@@ -2,7 +2,6 @@
 
 import datetime
 import sys
-import uuid
 
 import karton
 import karton.core
@@ -71,10 +70,12 @@ class ExtractorPoker(common.DelayingKarton):
                 "Ignoring task %s without state: %s", task.uid, task.headers)
             return
 
-        peekaboo_job_id = None
-        peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
-        if peekaboo_job_id_payload is not None:
-            peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
+        peekaboo_job_id = task.get_payload("peekaboo-job-id")
+        if peekaboo_job_id is not None and not isinstance(peekaboo_job_id, int):
+            self.log.warning(
+                "%s:%s: Dropping job with missing or invalid Peekaboo "
+                "job ID", task.root_uid, peekaboo_job_id)
+            return
 
         peekaboo_job_hash = EXTRACTOR_PEEKABOO_PER_JOB + str(task.root_uid)
 

@@ -4,7 +4,6 @@ import datetime
 import hashlib
 import json
 import sys
-import uuid
 
 import karton.core
 import karton.core.base
@@ -57,10 +56,12 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         self._post_hooks = []
 
     def process(self, task: karton.core.Task) -> None:
-        peekaboo_job_id = None
-        peekaboo_job_id_payload = task.get_payload("peekaboo-job-id")
-        if peekaboo_job_id_payload is not None:
-            peekaboo_job_id = uuid.UUID(peekaboo_job_id_payload)
+        peekaboo_job_id = task.get_payload("peekaboo-job-id")
+        if peekaboo_job_id is not None and not isinstance(peekaboo_job_id, int):
+            self.log.warning(
+                "%s:%s: Dropping job with missing or invalid Peekaboo "
+                "job ID", task.root_uid, peekaboo_job_id)
+            return
 
         self.log.info("%s:%s: Correlating.", self.job_id, peekaboo_job_id)
 
