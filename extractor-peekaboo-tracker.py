@@ -1,5 +1,6 @@
 #!/home/michael/karton-venv/bin/python3
 
+import datetime
 import sys
 import urllib.parse
 
@@ -13,6 +14,8 @@ import urllib3.util
 EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
 
 PEEKABOO_URL = "http://127.0.0.1:8100"
+
+TRACKER_JOB_AGE_CUTOFF = datetime.timedelta(seconds=600)
 
 config = karton.core.Config(sys.argv[1])
 
@@ -103,6 +106,16 @@ class ExtractorPeekabooTracker(karton.core.Karton):
             report_payload, error = self.track(peekaboo_job_id)
             if report_payload is None:
                 if error is None:
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    since_payload = task.get_payload("tracking-since")
+                    if since_payload is None:
+                        task.add_payload("tracking-since", now.isoformat())
+                    else:
+                        since = datetime.datetime.fromisoformat(since_payload)
+                        if since + TRACKER_JOB_AGE_CUTOFF < now:
+                            error = "job got too old: %s" % (now - since)
+
+                if error is None:
                     # not done yet - bounce back to the poker
                     delay_task = task.derive_task({
                         "type": "peekaboo-job",
@@ -115,9 +128,12 @@ class ExtractorPeekabooTracker(karton.core.Karton):
                         task.root_uid, peekaboo_job_id, delay_task.uid)
                     return
 
+                reason = f"Tracking Peekaboo job failed: {error}"
+                self.log.warning(
+                    "%s:%s: %s", task.root_uid, peekaboo_job_id, reason)
                 report_payload = {
                     "result": "failed",
-                    "reason": f"Tracking Peekaboo job failed: {error}",
+                    "reason": reason,
                 }
 
         # notify poker that this job is done and needs no more poking
