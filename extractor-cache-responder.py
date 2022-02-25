@@ -128,7 +128,9 @@ class PeekabooCacheResponder(karton.core.Karton):
             "kind": "raw",
         })
         self.send_task(classifier_task)
-        self.log.info("%s: No cache match - passed on", task.root_uid)
+        self.log.info(
+            "%s: No cache match on %s - passed on (%s)",
+            task.root_uid, criteria_key, task.uid)
 
 
 if __name__ == "__main__":

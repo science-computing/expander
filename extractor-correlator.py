@@ -158,6 +158,9 @@ class ExtractorJobCorrelator(karton.core.Consumer):
             now = datetime.datetime.now(
                 datetime.timezone.utc).timestamp() / 3600
             self.backend.redis.zadd(cache_key, {self.job_id: now})
+            self.log.info(
+                "%s: Recorded in cache as %s", self.job_id,
+                self.cache_criteria_key)
 
         self.log.info("%s: Correlated.", self.job_id)
         self.backend.unregister_bind(self.identity)
