@@ -10,7 +10,6 @@ import karton.core.task
 import common
 
 EXTRACTOR_PEEKABOO_JOBS = "extractor.peekaboo.jobs"
-EXTRACTOR_PEEKABOO_PER_JOB = "extractor.peekaboo.job:"
 
 # 60 seconds should be way enough for all race-conditions to resolve themselves
 RECHECK_CUTOFF = datetime.timedelta(seconds=60)
@@ -77,8 +76,6 @@ class ExtractorPoker(common.DelayingKarton):
                 "job ID", task.root_uid, peekaboo_job_id)
             return
 
-        peekaboo_job_hash = EXTRACTOR_PEEKABOO_PER_JOB + str(task.root_uid)
-
         headers = {
             "type": "peekaboo-job",
             "state": "to-track",
@@ -94,16 +91,13 @@ class ExtractorPoker(common.DelayingKarton):
             self.backend.redis.hincrby(
                 EXTRACTOR_PEEKABOO_JOBS, task.root_uid, 1)
 
-            # new jobs may have no job id if submit failed
-            if peekaboo_job_id is not None:
-                # also remember when we saw it first
-                now = datetime.datetime.now(datetime.timezone.utc)
-                first = now.isoformat()
-                self.backend.redis.hset(
-                    peekaboo_job_hash, str(peekaboo_job_id), first)
-
             # pass on to tracker, leave headers above as-is
             task = task.derive_task(headers)
+
+            # remember in the payload when we saw it first
+            task.add_payload("last-poke", datetime.datetime.now(
+                datetime.timezone.utc).isoformat())
+
             self.send_task(task)
             self.log.info(
                 "%s:%s: Initially poked Peekaboo job tracker (%s)",
@@ -117,9 +111,8 @@ class ExtractorPoker(common.DelayingKarton):
                     task.uid, task.headers)
                 return
 
-            last_string = self.backend.redis.hget(
-                peekaboo_job_hash, str(peekaboo_job_id))
-            if not last_string:
+            last_string = task.get_payload("last-poke")
+            if last_string is None:
                 self.log.warning(
                     "%s:%s: Ignoring delayed Peekaboo job we've apparently "
                     "never seen before", task.root_uid, peekaboo_job_id)
@@ -136,12 +129,14 @@ class ExtractorPoker(common.DelayingKarton):
                 self.log.info(
                     "%s:%s: Poking delay not yet expired, %s to go",
                     task.root_uid, peekaboo_job_id, poke_time - now)
+
+                # do not update last-poke payload, so it expires
             else:
                 # send to tracker for tracking and remember when we did so for
                 # potential next delay
-                updated_last = now.isoformat()
-                self.backend.redis.hset(
-                    peekaboo_job_hash, str(peekaboo_job_id), updated_last)
+                task.remove_payload("last-poke")
+                task.add_payload("last-poke", now.isoformat())
+
                 self.log.info(
                     "%s:%s: Poking Peekaboo job tracker",
                     task.root_uid, peekaboo_job_id)
@@ -152,10 +147,8 @@ class ExtractorPoker(common.DelayingKarton):
 
         if state in ["done", "done-recheck"]:
             # clean up
-            if peekaboo_job_id is not None and self.backend.redis.hdel(
-                    peekaboo_job_hash, str(peekaboo_job_id)):
-                # may have been removed by an ealier done message and we're now
-                # doing rechecks and do not want to spam the log
+            if state != "done-recheck":
+                # do not spam the log on rechecks
                 self.log.info(
                     "%s:%s: Removed Peekaboo job from tracking",
                     task.root_uid, peekaboo_job_id)
