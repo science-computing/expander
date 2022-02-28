@@ -176,8 +176,10 @@ class ExtractorPoker(common.DelayingKarton):
                     continue
 
                 if other_task.headers.get("type") in [
-                        "peekaboo-report", "extractor-correlator-poke"]:
-                    # ignore reports and correlator pokes
+                        "peekaboo-report", "extractor-correlator-poke",
+                        "extractor-dedupe-hold"]:
+                    # ignore reports and correlator pokes as well as
+                    # deduper holds
                     continue
 
                 # NOTE: This check is vulnerable to dangling forks in the

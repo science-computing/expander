@@ -10,7 +10,6 @@ import karton.core
 import common
 
 EXTRACTOR_RUNNING = "extractor.running"
-EXTRACTOR_RUNNING_SINCE = "extractor.running-since"
 EXTRACTOR_REPORTS = "extractor.reports"
 
 USE_CACHE = True
@@ -43,7 +42,10 @@ class ExtractorDeduper(common.DelayingKarton):
         {
             "type": "extractor-sample",
             "state": "dedupe-delayed",
-        }
+        },
+        {
+            "type": "extractor-dedupe-hold",
+        },
     ]
 
     def __init__(self, config=None, identity=None, backend=None, timeout=1):
@@ -63,28 +65,10 @@ class ExtractorDeduper(common.DelayingKarton):
         if self.last_gc + DEDUPE_GC_INTERVAL > now:
             return
 
+        # clear holds for which a report has materialized but the dedupe-hold
+        # message has maybe been lost - can race each other without negative
+        # impact
         running = self.backend.redis.hgetall(EXTRACTOR_RUNNING)
-        running_reverse = {}
-        for criteria, job_id in running.items():
-            running_reverse[job_id] = criteria
-
-        running_since = self.backend.redis.hgetall(EXTRACTOR_RUNNING_SINCE)
-        for job_id, timestamp in running_since.copy().items():
-            # twice the cutoff makes them doubly invalid - they've been ignored
-            # since the cutoff was reached
-            since = datetime.datetime.fromisoformat(timestamp)
-            if since + 2 * DEDUPE_CUTOFF < now:
-                # backreference into running locks to keep them consistent
-                criteria = running_reverse.get(job_id)
-                if criteria is not None:
-                    self.backend.redis.hdel(EXTRACTOR_RUNNING, criteria)
-                    del running_reverse[job_id]
-                    del running[criteria]
-
-                self.log.info("Clearing old timestamp of job %s", job_id)
-                self.backend.redis.hdel(EXTRACTOR_RUNNING_SINCE, job_id)
-                del running_since[job_id]
-
         for criteria, job_id in running.copy().items():
             if not self.backend.redis.hexists(EXTRACTOR_REPORTS, job_id):
                 continue
@@ -94,31 +78,20 @@ class ExtractorDeduper(common.DelayingKarton):
             self.backend.redis.hdel(EXTRACTOR_RUNNING, criteria)
             del running[criteria]
 
-            # forward reference into timestamps to keep consistency
-            if running_since.get(job_id) is not None:
-                self.backend.redis.hdel(EXTRACTOR_RUNNING_SINCE, job_id)
-                del running_since[job_id]
-
-        # clear out locks which still have no timestamp assigned in this
-        # iteration
+        # clear out holds which still have no job report assigned in this
+        # iteration at which point we're at least once GC interval and
+        # therefore two times past the dedupe cutoff after which duplicates
+        # started being passed through regardless of the hold anyway
         for criteria in self.orphaned_locks:
             job_id = self.backend.redis.hget(EXTRACTOR_RUNNING, criteria)
             if job_id is None:
                 continue
 
-            if self.backend.redis.hexists(EXTRACTOR_RUNNING_SINCE, job_id):
-                continue
-
             self.log.info("Clearing orphaned lock %s", criteria)
             self.backend.redis.hdel(EXTRACTOR_RUNNING, criteria)
 
-        self.orphaned_locks = []
-        for criteria, job_id in running.items():
-            if running_since.get(job_id) is not None:
-                continue
-
-            self.orphaned_locks.append(criteria)
-
+        # running contains all jobs which had no report in this iteration
+        self.orphaned_locks = running
         self.last_gc = now
 
     def process(self, task: karton.core.Task) -> None:
@@ -134,6 +107,64 @@ class ExtractorDeduper(common.DelayingKarton):
                 "type": "extractor-sample",
                 "state": "deduped",
             }
+
+        hold_headers = {
+            "type": "extractor-dedupe-hold",
+            "delay-queue": self.delay_queues[self.next_delay_queue],
+        }
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        task_type = task.headers.get("type")
+        if task_type == "extractor-dedupe-hold":
+            criteria = task.get_payload("criteria")
+            if criteria is None:
+                self.log.warning(
+                    "%s: Dropping dedupe hold without criteria", task.root_uid)
+                return
+
+            # clear the hold if a report has materialized
+            if self.backend.redis.hexists(EXTRACTOR_REPORTS, task.root_uid):
+                self.log.info(
+                    "%s: Job has finished, clearing duplicate hold",
+                    task.root_uid)
+                self.backend.redis.hdel(EXTRACTOR_RUNNING, criteria)
+                return
+
+            set_at_payload = task.get_payload("set-at")
+            if set_at_payload is None:
+                self.log.warning(
+                    "%s: Dropping dedupe hold without criteria-key or set-at",
+                    task.root_uid)
+                return
+
+            set_at = datetime.datetime.fromisoformat(set_at_payload)
+
+            # keep jobs from starving
+            if set_at + DEDUPE_CUTOFF <= now:
+                task = task.derive_task(deduped_headers)
+                self.send_task(task)
+                self.log.info(
+                    "%s: Job has potentially been blocking duplicates for %s "
+                    "now - clearing hold", task.root_uid, now - set_at)
+                self.backend.redis.hdel(EXTRACTOR_RUNNING, criteria)
+                return
+
+            # poke ourselves again on next iteration
+            task = task.derive_task(hold_headers)
+            self.send_task(task)
+            self.log.info(
+                "%s: No new status on dedupe hold - looping though (%s)",
+                task.root_uid, task.uid)
+            return
+
+        if task_type != "extractor-sample":
+            task = task.derive_task(deduped_headers)
+            self.send_task(task)
+            self.log.warning(
+                "%s: Passing on task %s with unknown type: %s",
+                task.root_uid, task.uid, task_type)
+            return
 
         state = task.headers.get("state")
         if state is None:
@@ -172,31 +203,47 @@ class ExtractorDeduper(common.DelayingKarton):
         # new and delayed tasks are treated (almost) the same for code
         # efficiency and robustness
         if state == "new":
-            # try to lock new jobs
+            # try to lock new jobs - this together with hold removal on
+            # detection of job completion above creates a kind of burst mode:
+            # the first of duplicate samples will cause others to be held as
+            # long its job is running. The hold is cleared when the job is
+            # finished and all *held* duplicates will sail on through. But the
+            # next *new* sample with the same criteria will set the hold again.
+            # This should nicely limit the churn from duplicates whose jobs
+            # keep failing and only marginally slow down responses for
+            # successful jobs because the cache responder will very quickly
+            # finish the job of the blocking duplicate so others can sail on
+            # through again.
             if self.backend.redis.hsetnx(
                     EXTRACTOR_RUNNING, criteria_key, task.root_uid):
-                # remember when this was seen
-                now = datetime.datetime.now(datetime.timezone.utc)
-                since = now.isoformat()
-                self.backend.redis.hset(
-                    EXTRACTOR_RUNNING_SINCE, task.root_uid, since)
-
                 # pass on
                 task = task.derive_task(deduped_headers)
                 self.send_task(task)
                 self.log.info(
                     "%s: Task is no dupe - passing on (%s)",
                     task.root_uid, task.uid)
+
+                # poke ourselves to check if it finished so we can unblock held
+                # duplicates
+                task = karton.core.Task(
+                    headers=hold_headers,
+                    payload={
+                        "criteria": criteria_key,
+                        "set-at": now.isoformat(),
+                    },
+                )
+                self.send_task(task)
                 return
 
+        # may have been deleted by dedupe hold being removed (even as a race
+        # condition between setnx for new samples above and here, which is fine)
         job_id = self.backend.redis.hget(EXTRACTOR_RUNNING, criteria_key)
         if job_id is None:
             task = task.derive_task(deduped_headers)
             self.send_task(task)
             self.log.info(
-                "%s: Task is dupe but colliding job ID is "
-                "(inconsistently) not recorded - passing on (%s)",
-                task.root_uid, task.uid)
+                "%s: Task is dupe but colliding job ID seems to have finished "
+                "- passing on (%s)", task.root_uid, task.uid)
             return
 
         # report should provide cache hit (but will not for failed jobs - could
@@ -209,19 +256,13 @@ class ExtractorDeduper(common.DelayingKarton):
                 "on (%s)", task.root_uid, job_id, task.uid)
             return
 
-        since_string = self.backend.redis.hget(
-            EXTRACTOR_RUNNING_SINCE, job_id)
+        since_string = task.get_payload("dedupe-held-since")
         if since_string is None:
-            task = task.derive_task(deduped_headers)
-            self.send_task(task)
-            self.log.info(
-                "%s: Task is dupe colliding job %s start time is "
-                "(inconsistently) not recorded - passing on (%s)",
-                task.root_uid, job_id, task.uid)
-            return
+            # remember when this was seen first
+            since_string = now.isoformat()
+            task.add_payload("dedupe-held-since", since_string)
 
         # keep jobs from starving
-        now = datetime.datetime.now(datetime.timezone.utc)
         since = datetime.datetime.fromisoformat(since_string)
         if since + DEDUPE_CUTOFF <= now:
             task = task.derive_task(deduped_headers)
