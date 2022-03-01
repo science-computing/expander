@@ -1,0 +1,105 @@
+version: '3'
+
+services:
+  # based on karton-playground
+  minio:
+    image: minio/minio
+    command: "server /data"
+    env_file:
+      - docker-compose.env
+  redis:
+    image: redis:alpine
+  karton-system:
+    image: certpl/karton-system
+    depends_on:
+      - redis
+      - minio
+    command: --setup-bucket
+    env_file:
+      - docker-compose.env
+  karton-logs:
+    image: certpl/karton-system
+    depends_on:
+      - karton-system
+    entrypoint: karton
+    command: logs
+    env_file:
+      - docker-compose.env
+  karton-classifier:
+    image: certpl/karton-classifier
+    depends_on:
+      - karton-logs
+    env_file:
+      - docker-compose.env
+  karton-archive-extractor:
+    # no :latest
+    image: certpl/karton-archive-extractor:6c9fd2581a3261c18bc1b0fc3c692231a48fabf9
+    depends_on:
+      - karton-logs
+    env_file:
+      - docker-compose.env
+  karton-dashboard:
+    image: certpl/karton-dashboard:8f5bdd94bed2ddff2ef4a826f8107a8ec11e8609
+    depends_on:
+      - karton-logs
+    ports:
+      - "127.0.0.1:5000:5000"
+    env_file:
+      - docker-compose.env
+  extractor-api:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    env_file:
+      - docker-compose.env
+    ports:
+      - "127.0.0.1:8200:8200"
+  extractor-deduper:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    entrypoint: /opt/extractor/bin/extractor-deduper
+    env_file:
+      - docker-compose.env
+  extractor-cache-responder:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    entrypoint: /opt/extractor/bin/extractor-cache-responder
+    env_file:
+      - docker-compose.env
+  extractor-peekaboo-submitter:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    entrypoint: /opt/extractor/bin/extractor-peekaboo-submitter
+    env_file:
+      - docker-compose.env
+  extractor-poker:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    entrypoint: /opt/extractor/bin/extractor-poker
+    env_file:
+      - docker-compose.env
+  extractor-peekaboo-tracker:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    entrypoint: /opt/extractor/bin/extractor-peekaboo-tracker
+    env_file:
+      - docker-compose.env
+  extractor-correlator:
+    image: extractor
+    build: .
+    depends_on:
+      - karton-logs
+    entrypoint: /opt/extractor/bin/extractor-correlator
+    env_file:
+      - docker-compose.env
