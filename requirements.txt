@@ -1,0 +1,4 @@
+karton-core
+requests
+sanic
+schema
