@@ -2,4 +2,4 @@
 
 PoC
 
-[![](extractor.svg)](extractor.svg?raw=true)
+[![](docs/extractor.svg)](docs/extractor.svg?raw=true)
