@@ -7,19 +7,13 @@ import sys
 
 import karton.core
 
-USE_DEDUPER = True
-
-EXTRACTOR_REPORTS = "extractor.reports"
-EXTRACTOR_JOB_CACHE = "extractor.cache:"
-
-CACHE_AGE_OUT_INTERVAL = datetime.timedelta(seconds=60)
-CACHE_MAX_AGE = datetime.timedelta(seconds=240)
-
-config = karton.core.Config(sys.argv[1])
+from .. import __version__
 
 
-class PeekabooCacheResponder(karton.core.Karton):
+class ExtractorCacheResponder(karton.core.Karton):
+    """ extractor cache responder karton """
     identity = "extractor.cache-responder"
+    version = __version__
 
     def __init__(self, config=None, identity=None, backend=None):
         self.filters = [
@@ -29,13 +23,22 @@ class PeekabooCacheResponder(karton.core.Karton):
             }
         ]
 
-        if USE_DEDUPER:
+        if config.config.getboolean("extractor", "use_deduper", fallback=True):
             self.filters = [
                 {
                     "type": "extractor-sample",
                     "state": "deduped",
                 }
             ]
+
+        self.age_out_interval = datetime.timedelta(seconds=config.config.getint(
+            "extractorcacheresponder", "age_out_interval", fallback=60))
+        self.max_age = datetime.timedelta(seconds=config.config.getint(
+            "extractorcacheresponder", "max_age", fallback=240))
+        self.reports_key = config.config.get(
+            "extractor", "reports_key", fallback="extractor.reports")
+        self.job_cache_key = config.config.get(
+            "extractor", "job_cache_key", fallback="extractor.cache:")
 
         super().__init__(config=config, identity=identity, backend=backend)
 
@@ -48,13 +51,13 @@ class PeekabooCacheResponder(karton.core.Karton):
 
     def age_out(self):
         now = datetime.datetime.now(datetime.timezone.utc)
-        if self.last_age_out + CACHE_AGE_OUT_INTERVAL > now:
+        if self.last_age_out + self.age_out_interval > now:
             return
 
         cutoff_date = datetime.datetime.now(
-            datetime.timezone.utc) - CACHE_MAX_AGE
+            datetime.timezone.utc) - self.max_age
         cutoff_score = cutoff_date.timestamp() / 3600
-        for entry in self.backend.redis.keys(EXTRACTOR_JOB_CACHE + "*"):
+        for entry in self.backend.redis.keys(self.job_cache_key + "*"):
             # keys becoming empty makes them magically disappear as well
             aged_out = self.backend.redis.zremrangebyscore(
                 entry, 0, cutoff_score)
@@ -93,9 +96,9 @@ class PeekabooCacheResponder(karton.core.Karton):
         # look for an earlier job that processed the same sample with the same
         # parameters, sorted set provides implicit sorting from oldes to newest
         # extractor.cache:<sha256>[<job_id>] = <hours since epoch (float)>
-        cache_key = EXTRACTOR_JOB_CACHE + criteria_key
+        cache_key = self.job_cache_key + criteria_key
         for job_id in self.backend.redis.zrange(cache_key, 0, -1, desc=True):
-            report_json = self.backend.redis.hget(EXTRACTOR_REPORTS, job_id)
+            report_json = self.backend.redis.hget(self.reports_key, job_id)
             if report_json is None:
                 self.log.warning(
                     "%s: Cache inconsistency, report %s missing",
@@ -108,7 +111,7 @@ class PeekabooCacheResponder(karton.core.Karton):
 
             # update cache and be done
             self.backend.redis.hset(
-                EXTRACTOR_REPORTS, task.root_uid, json.dumps(report))
+                self.reports_key, task.root_uid, json.dumps(report))
             self.log.info(
                 "%s: Short-circuited with cached report %s",
                 task.root_uid, job_id)
@@ -133,11 +136,5 @@ class PeekabooCacheResponder(karton.core.Karton):
             task.root_uid, criteria_key, task.uid)
 
 
-def main():
-    """ entrypoint """
-    c = PeekabooCacheResponder(config)
-    c.loop()
-
-
 if __name__ == "__main__":
-    main()
+    ExtractorCacheResponder.main()

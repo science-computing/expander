@@ -100,12 +100,16 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "extractor-api = extractor.api:main",
-            "extractor-deduper = extractor.deduper:main",
-            "extractor-cache-responder = extractor.cache.responder:main",
-            "extractor-peekaboo-submitter = extractor.peekaboo.submitter:main",
-            "extractor-poker = extractor.poker:main",
-            "extractor-peekaboo-tracker = extractor.peekaboo.tracker:main",
-            "extractor-correlator = extractor.correlator:main",
+            "extractor-deduper = extractor.deduper:ExtractorDeduper.main",
+            "extractor-cache-responder = "
+                "extractor.cache.responder:ExtractorCacheResponder.main",
+            "extractor-peekaboo-submitter = "
+                "extractor.peekaboo.submitter:ExtractorPeekabooSubmitter.main",
+            "extractor-poker = extractor.poker:ExtractorPoker.main",
+            "extractor-peekaboo-tracker = "
+                "extractor.peekaboo.tracker:ExtractorPeekabooTracker.main",
+            "extractor-correlator = "
+                "extractor.correlator:ExtractorCorrelator.main",
         ],
     }
 )

@@ -7,19 +7,14 @@ import karton
 import karton.core
 import karton.core.task
 
-from .common import DelayingKarton, DelayingKartonBackend
-
-EXTRACTOR_JOBS = "extractor.jobs"
-
-# 60 seconds should be way enough for all race-conditions to resolve themselves
-RECHECK_CUTOFF = datetime.timedelta(seconds=60)
-
-config = karton.core.Config(sys.argv[1])
+from . import __version__
+from .common import DelayingKarton
 
 
 class ExtractorPoker(DelayingKarton):
-    """ Poker Karton class """
+    """ extractor poker karton """
     identity = "extractor.poker"
+    version = __version__
     filters = [
         {
             "type": "peekaboo-job",
@@ -43,7 +38,18 @@ class ExtractorPoker(DelayingKarton):
 
     def __init__(self, config=None, identity=None, backend=None,
                  timeout=1, poking_delay=3):
-        self.poking_delay = poking_delay
+        self.poking_delay = datetime.timedelta(seconds=config.config.getint(
+            "extractorpoker", "poking_delay", fallback=poking_delay))
+        timeout = config.config.getint(
+            "extractorpoker", "timeout", fallback=timeout)
+
+        self.jobs_key = config.config.get(
+            "extractor", "jobs_key", fallback="extractor.jobs")
+
+        # 60 seconds should be way enough for all race-conditions to resolve
+        # themselves
+        self.recheck_cutoff = datetime.timedelta(seconds=config.config.getint(
+            "extractorpoker", "cutoff", fallback=60))
 
         super().__init__(
             config=config, identity=identity, backend=backend, timeout=timeout)
@@ -82,8 +88,7 @@ class ExtractorPoker(DelayingKarton):
         if state == "new":
             # correlate this job with its extractor job for deciding
             # when all spawned jobs are finished
-            self.backend.redis.hincrby(
-                EXTRACTOR_JOBS, task.root_uid, 1)
+            self.backend.redis.hincrby(self.jobs_key, task.root_uid, 1)
 
             # pass on to tracker, leave headers above as-is
             tracker_task = task.derive_task(headers)
@@ -108,7 +113,7 @@ class ExtractorPoker(DelayingKarton):
 
             last = datetime.datetime.fromisoformat(last_string)
             now = datetime.datetime.now(datetime.timezone.utc)
-            poke_time = last + datetime.timedelta(seconds=self.poking_delay)
+            poke_time = last + self.poking_delay
 
             if poke_time > now:
                 # hand back to ourselves via the next delay queue for looking
@@ -144,12 +149,12 @@ class ExtractorPoker(DelayingKarton):
             # NOTE: we consider this an atomic operation which is preventing us
             # from producing multiple correlator pokes
             jobs_left = self.backend.redis.hincrby(
-                EXTRACTOR_JOBS, task.root_uid, -1)
+                self.jobs_key, task.root_uid, -1)
             if jobs_left < 0:
                 self.log.warning(
                     "%s:%s: Job count corrupted (%d) - dropping job",
                     task.root_uid, task.uid, jobs_left)
-                self.backend.redis.hdel(EXTRACTOR_JOBS, task.root_uid)
+                self.backend.redis.hdel(self.jobs_key, task.root_uid)
                 return
 
             if jobs_left != 0:
@@ -199,7 +204,7 @@ class ExtractorPoker(DelayingKarton):
                         recheck_start_payload)
 
                 delay_and_recheck = True
-                if recheck_start + RECHECK_CUTOFF < now:
+                if recheck_start + self.recheck_cutoff < now:
                     self.log.warning(
                         "%s: Lingering task %s is blocking correlation.",
                         task.root_uid, other_task.uid)
@@ -229,8 +234,7 @@ class ExtractorPoker(DelayingKarton):
                     # re-increment the pending jobs counter so upon re-check we
                     # can again atomically decide if the job count reached zero
                     # or not
-                    self.backend.redis.hincrby(
-                        EXTRACTOR_JOBS, task.root_uid, 1)
+                    self.backend.redis.hincrby(self.jobs_key, task.root_uid, 1)
 
                     headers["state"] = "done-recheck"
                     task = task.derive_task(headers)
@@ -244,7 +248,7 @@ class ExtractorPoker(DelayingKarton):
                     return
 
             # all jobs tracked and reported - poke the correlator
-            self.backend.redis.hdel(EXTRACTOR_JOBS, task.root_uid)
+            self.backend.redis.hdel(self.jobs_key, task.root_uid)
             task = karton.core.Task(
                 headers={"type": "extractor-correlator-poke"})
             self.send_task(task)
@@ -261,9 +265,7 @@ class ExtractorPoker(DelayingKarton):
 
 def main():
     """ entrypoint """
-    non_blocking_backend = DelayingKartonBackend(config)
-    c = ExtractorPoker(config, backend=non_blocking_backend)
-    c.loop()
+    ExtractorPoker.main()
 
 
 if __name__ == "__main__":

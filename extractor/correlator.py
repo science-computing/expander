@@ -8,12 +8,7 @@ import sys
 import karton.core
 import karton.core.base
 
-EXTRACTOR_REPORTS = "extractor.reports"
-EXTRACTOR_JOB_CACHE = "extractor.cache:"
-
-EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
-
-config = karton.core.Config(sys.argv[1])
+from . import __version__
 
 
 class NonBlockingKartonBackend(karton.core.backend.KartonBackend):
@@ -28,6 +23,9 @@ class NonBlockingKartonBackend(karton.core.backend.KartonBackend):
 
 
 class ExtractorJobCorrelator(karton.core.Consumer):
+    """ extractor job correlator """
+    version = __version__
+
     def __init__(self, job_id, config=None, backend=None):
         self.job_id = job_id
 
@@ -45,7 +43,14 @@ class ExtractorJobCorrelator(karton.core.Consumer):
         # cache key
         self.cache_criteria_key = None
 
-        identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(job_id)
+        self.reports_key = config.config.get(
+            "extractor", "reports_key", fallback="extractor.reports")
+        self.job_cache_key = config.config.get(
+            "extractor", "job_cache_key", fallback="extractor.cache:")
+
+        identity = config.config.get(
+            "extractor", "correlator_reports_identity",
+            fallback="extractor.correlator-for-job-") + str(job_id)
 
         # avoid GracefulKiller from KartonServiceBase
         super(karton.core.base.KartonServiceBase, self).__init__(
@@ -147,14 +152,14 @@ class ExtractorJobCorrelator(karton.core.Consumer):
             report["jobs"] = self.jobs
         
         self.backend.redis.hset(
-            EXTRACTOR_REPORTS, self.job_id, json.dumps(job_info))
+            self.reports_key, self.job_id, json.dumps(job_info))
 
         # add to cache
         if overall_result != "failed" and self.cache_criteria_key is not None:
             # extractor.cache:<sha256>[<job_id>] = <hours since epoch (float)>
             # cache collisions are no big deal because we need only *something*
             # to be cached not everyhing
-            cache_key = EXTRACTOR_JOB_CACHE + self.cache_criteria_key
+            cache_key = self.job_cache_key + self.cache_criteria_key
             now = datetime.datetime.now(
                 datetime.timezone.utc).timestamp() / 3600
             self.backend.redis.zadd(cache_key, {self.job_id: now})
@@ -167,7 +172,9 @@ class ExtractorJobCorrelator(karton.core.Consumer):
 
 
 class ExtractorCorrelator(karton.core.Consumer):
+    """ extractor correlator """
     identity = "extractor.correlator"
+    version = __version__
     filters = [
         {
             "type": "extractor-correlator-poke",
@@ -189,11 +196,5 @@ class ExtractorCorrelator(karton.core.Consumer):
         job_correlator.correlate()
 
 
-def main():
-    """ entrypoint """
-    c = ExtractorCorrelator(config)
-    c.loop()
-
-
 if __name__ == "__main__":
-    main()
+    ExtractorCorrelator.main()

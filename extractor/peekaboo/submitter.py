@@ -8,13 +8,13 @@ import requests
 import schema
 import urllib3.util
 
-PEEKABOO_URL = "http://127.0.0.1:8100"
-
-config = karton.core.Config(sys.argv[1])
+from .. import __version__
 
 
-class PeekabooSubmitter(karton.core.Karton):
+class ExtractorPeekabooSubmitter(karton.core.Karton):
+    """ extractor peekaboo submitter karton """
     identity = "extractor.peekaboo-submitter"
+    version = __version__
     filters = [
         {
             "type": "sample",
@@ -26,15 +26,19 @@ class PeekabooSubmitter(karton.core.Karton):
         }
     ]
 
-    def __init__(self, config=None, identity=None, backend=None):
+    def __init__(self, config=None, identity=None, backend=None,
+                 url="http://127.0.0.1:8100", retries=5, backoff=0.5):
         super().__init__(config=config, identity=identity, backend=backend)
 
-        self.url = PEEKABOO_URL
-        self.retries = 5
-        self.backoff = 0.5
+        self.url = config.config.get("extractorpeekaboo", "url", fallback=url)
+
+        retries = config.config.getint(
+            "extractorpeekaboo", "retries", fallback=retries)
+        backoff = config.config.getfloat(
+            "extractorpeekaboo", "backoff", fallback=backoff)
 
         retry_config = urllib3.util.Retry(
-            total=self.retries, backoff_factor=self.backoff,
+            total=retries, backoff_factor=backoff,
             allowed_methods=frozenset({"POST"}),
             status_forcelist=frozenset({413, 429, 500, 503}),
             raise_on_status=False, raise_on_redirect=False)
@@ -161,11 +165,5 @@ class PeekabooSubmitter(karton.core.Karton):
         # condition with the all-jobs-finished check in the poker
 
 
-def main():
-    """ entrypoint """
-    c = PeekabooSubmitter(config)
-    c.loop()
-
-
 if __name__ == "__main__":
-    main()
+    ExtractorPeekabooSubmitter.main()

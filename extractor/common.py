@@ -79,6 +79,10 @@ class DelayingKarton(karton.core.Karton):
     def __init__(self, config=None, identity=None, backend=None, timeout=1):
         self.timeout = timeout
 
+        # inject our delaying backend by default
+        if backend is None:
+            backend = DelayingKartonBackend(config)
+
         super().__init__(config=config, identity=identity, backend=backend)
 
         # add alternating delay queues later on

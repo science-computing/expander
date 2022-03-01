@@ -1,5 +1,6 @@
 """ A REST API for submitting samples """
 
+import argparse
 import asyncio
 import base64
 import binascii
@@ -17,14 +18,13 @@ import sanic.headers
 import sanic.response
 import schema
 
+from . import __version__
+
 logger = logging.getLogger(__name__)
 
-USE_CACHE = True
-USE_DEDUPER = True
-
-EXTRACTOR_REPORTS = "extractor.reports"
 
 class ExtractorAPI:
+    """ extractor api """
     def __init__(self, karton_config, host="127.0.0.1", port=8200, request_queue_size=100):
         logger.debug('Starting up server.')
         self.app = sanic.Sanic("Extractor-API", configure_logging=False)
@@ -32,6 +32,14 @@ class ExtractorAPI:
 
         self.karton = karton.core.Producer(
             karton_config, identity="extractor.api")
+        self.use_cache = config.config.getboolean(
+            "extractor", "use_cache", fallback=True)
+        self.use_deduper = config.config.getboolean(
+            "extractor", "use_deduper", fallback=True)
+        self.reports_key = config.config.get(
+            "extractor", "reports_key", fallback="extractor.reports")
+        host = config.config.get("extractorapi", "host", fallback=host)
+        port = config.config.getint("extractorapi", "port", fallback=port)
 
         # silence sanic to a reasonable amount
         logging.getLogger('sanic.root').setLevel(logging.WARNING)
@@ -252,7 +260,7 @@ class ExtractorAPI:
         resource = karton.core.Resource(file_name, content=file_content)
 
         headers = {"type": "sample", "kind": "raw"}
-        if USE_CACHE or USE_DEDUPER:
+        if self.use_cache or self.use_deduper:
             headers = {"type": "extractor-sample", "state": "new"}
 
         task = karton.core.Task(
@@ -290,7 +298,7 @@ class ExtractorAPI:
                 {'message': 'job ID missing from request'}, 400)
 
         report_json = self.karton.backend.redis.hget(
-            EXTRACTOR_REPORTS, str(job_id))
+            self.reports_key, str(job_id))
         if not report_json:
             logger.debug('No analysis result yet for job %s', job_id)
             return sanic.response.json(
@@ -328,7 +336,12 @@ class ExtractorAPI:
 logging.basicConfig()
 logger.setLevel(logging.DEBUG)
 
-config = karton.core.Config(sys.argv[1])
+parser = argparse.ArgumentParser(description=ExtractorAPI.__doc__)
+parser.add_argument("--version", action="version", version=__version__)
+parser.add_argument("--config-file", help="Alternative configuration path")
+args = parser.parse_args()
+
+config = karton.core.Config(args.config_file)
 api = ExtractorAPI(config)
 
 def signal_handler(sig):

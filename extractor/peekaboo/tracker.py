@@ -11,17 +11,13 @@ import requests
 import schema
 import urllib3.util
 
-EXTRACTOR_CORRELATOR_REPORTS_IDENTITY = "extractor.correlator-for-job-"
-
-PEEKABOO_URL = "http://127.0.0.1:8100"
-
-TRACKER_JOB_AGE_CUTOFF = datetime.timedelta(seconds=600)
-
-config = karton.core.Config(sys.argv[1])
+from .. import __version__
 
 
 class ExtractorPeekabooTracker(karton.core.Karton):
+    """ extractor peekaboo tracker karton """
     identity = "extractor.peekaboo-tracker"
+    version = __version__
     filters = [
         {
             "type": "peekaboo-job",
@@ -29,16 +25,29 @@ class ExtractorPeekabooTracker(karton.core.Karton):
         }
     ]
 
-    def __init__(self, config=None, identity=None, backend=None):
+    def __init__(self, config=None, identity=None, backend=None,
+                 url="http://127.0.0.1:8100", retries=5, backoff=0.5,
+                 job_age_cutoff=600,
+                 reports_identity="extractor.correlator-for-job-"):
         super().__init__(config=config, identity=identity, backend=backend)
 
-        self.url = PEEKABOO_URL
+        self.reports_identity = config.config.get(
+            "extractor", "correlator_reports_identity",
+            fallback=reports_identity)
 
-        self.retries = 5
-        self.backoff = 0.5
+        self.job_age_cutoff = datetime.timedelta(seconds=config.config.getint(
+            "extractorpeekabootracker", "job_age_cutoff",
+            fallback=job_age_cutoff))
+
+        self.url = config.config.get("extractorpeekaboo", "url", fallback=url)
+
+        retries = config.config.getint(
+            "extractorpeekaboo", "retries", fallback=retries)
+        backoff = config.config.getfloat(
+            "extractorpeekaboo", "backoff", fallback=backoff)
 
         retry_config = urllib3.util.Retry(
-            total=self.retries, backoff_factor=self.backoff,
+            total=retries, backoff_factor=backoff,
             allowed_methods=frozenset({"POST"}),
             status_forcelist=frozenset({413, 429, 500, 503}),
             raise_on_status=False, raise_on_redirect=False)
@@ -112,7 +121,7 @@ class ExtractorPeekabooTracker(karton.core.Karton):
                         task.add_payload("tracking-since", now.isoformat())
                     else:
                         since = datetime.datetime.fromisoformat(since_payload)
-                        if since + TRACKER_JOB_AGE_CUTOFF < now:
+                        if since + self.job_age_cutoff < now:
                             error = "job got too old: %s" % (now - since)
 
                 if error is None:
@@ -153,7 +162,7 @@ class ExtractorPeekabooTracker(karton.core.Karton):
         # register a persistent queue for this extractor job (if there isn't one
         # already) where to park the job reports until all jobs are done
         bind = None
-        report_identity = EXTRACTOR_CORRELATOR_REPORTS_IDENTITY + str(task.root_uid)
+        report_identity = self.reports_identity + str(task.root_uid)
         try:
             bind = self.backend.get_bind(report_identity)
         except TypeError:
@@ -193,11 +202,5 @@ class ExtractorPeekabooTracker(karton.core.Karton):
         # condition with the all-jobs-finished check in the poker
 
 
-def main():
-    """ entrypoint """
-    c = ExtractorPeekabooTracker(config)
-    c.loop()
-
-
 if __name__ == "__main__":
-    main()
+    ExtractorPeekabooTracker.main()
