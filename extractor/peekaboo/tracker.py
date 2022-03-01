@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A Karton that tracks jobs in Peekaboo and retrieves reports. """
 
 import datetime
 import sys
@@ -193,6 +193,11 @@ class ExtractorPeekabooTracker(karton.core.Karton):
         # condition with the all-jobs-finished check in the poker
 
 
-if __name__ == "__main__":
+def main():
+    """ entrypoint """
     c = ExtractorPeekabooTracker(config)
     c.loop()
+
+
+if __name__ == "__main__":
+    main()

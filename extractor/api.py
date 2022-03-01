@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A REST API for submitting samples """
 
 import asyncio
 import base64
@@ -338,10 +338,19 @@ def signal_handler(sig):
         logger.debug("SIGINT/TERM")
         api.shut_down()
 
-async def main():
+
+async def async_main():
+    """ asyncio entrypoint """
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal.SIGINT, signal_handler, signal.SIGINT)
     loop.add_signal_handler(signal.SIGTERM, signal_handler, signal.SIGTERM)
     await api.serve()
 
-asyncio.run(main())
+
+def main():
+    """ entrypoint """
+    asyncio.run(async_main())
+
+
+if __name__ == "__main__":
+    main()

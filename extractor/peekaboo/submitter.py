@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A Karton that submits samples to Peekaboo for analysis. """
 
 import sys
 import urllib.parse
@@ -161,6 +161,11 @@ class PeekabooSubmitter(karton.core.Karton):
         # condition with the all-jobs-finished check in the poker
 
 
-if __name__ == "__main__":
+def main():
+    """ entrypoint """
     c = PeekabooSubmitter(config)
     c.loop()
+
+
+if __name__ == "__main__":
+    main()

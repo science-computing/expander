@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A Karton that holds back duplicate samples until a first has completed. """
 
 import datetime
 import hashlib
@@ -7,7 +7,7 @@ import sys
 import karton
 import karton.core
 
-import common
+from .common import DelayingKarton, DelayingKartonBackend
 
 EXTRACTOR_RUNNING = "extractor.running"
 EXTRACTOR_REPORTS = "extractor.reports"
@@ -29,7 +29,8 @@ DEDUPE_GC_INTERVAL = 2 * DEDUPE_CUTOFF
 config = karton.core.Config(sys.argv[1])
 
 
-class ExtractorDeduper(common.DelayingKarton):
+class ExtractorDeduper(DelayingKarton):
+    """ extractor deduper karton """
     identity = "extractor.deduper"
     filters = [
         {
@@ -283,8 +284,13 @@ class ExtractorDeduper(common.DelayingKarton):
             "%s: Task is dupe - delaying (%s)", task.root_uid, task.uid)
 
 
-if __name__ == "__main__":
-    non_blocking_backend = common.DelayingKartonBackend(config)
+def main():
+    """ entrypoint """
+    non_blocking_backend = DelayingKartonBackend(config)
     c = ExtractorDeduper(
         config, backend=non_blocking_backend, timeout=DEDUPE_RECHECK)
     c.loop()
+
+
+if __name__ == "__main__":
+    main()

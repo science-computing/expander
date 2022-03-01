@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A Karton that correlates job reports into a summary report. """
 
 import datetime
 import hashlib
@@ -189,6 +189,11 @@ class ExtractorCorrelator(karton.core.Consumer):
         job_correlator.correlate()
 
 
-if __name__ == "__main__":
+def main():
+    """ entrypoint """
     c = ExtractorCorrelator(config)
     c.loop()
+
+
+if __name__ == "__main__":
+    main()

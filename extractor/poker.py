@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A Karton that pokes job trackers and correlators based on conditions. """
 
 import datetime
 import sys
@@ -7,7 +7,7 @@ import karton
 import karton.core
 import karton.core.task
 
-import common
+from .common import DelayingKarton, DelayingKartonBackend
 
 EXTRACTOR_JOBS = "extractor.jobs"
 
@@ -17,7 +17,8 @@ RECHECK_CUTOFF = datetime.timedelta(seconds=60)
 config = karton.core.Config(sys.argv[1])
 
 
-class ExtractorPoker(common.DelayingKarton):
+class ExtractorPoker(DelayingKarton):
+    """ Poker Karton class """
     identity = "extractor.poker"
     filters = [
         {
@@ -258,7 +259,12 @@ class ExtractorPoker(common.DelayingKarton):
             task.root_uid, task.uid, state)
 
 
-if __name__ == "__main__":
-    non_blocking_backend = common.DelayingKartonBackend(config)
+def main():
+    """ entrypoint """
+    non_blocking_backend = DelayingKartonBackend(config)
     c = ExtractorPoker(config, backend=non_blocking_backend)
     c.loop()
+
+
+if __name__ == "__main__":
+    main()

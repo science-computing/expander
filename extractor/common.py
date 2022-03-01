@@ -1,3 +1,5 @@
+""" Common functionality used by multiple Kartons """
+
 import datetime
 
 import karton.core

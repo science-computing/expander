@@ -1,4 +1,4 @@
-#!/home/michael/karton-venv/bin/python3
+""" A Karton that consults a report cache for short-circuiting samples. """
 
 import datetime
 import hashlib
@@ -133,6 +133,11 @@ class PeekabooCacheResponder(karton.core.Karton):
             task.root_uid, criteria_key, task.uid)
 
 
-if __name__ == "__main__":
+def main():
+    """ entrypoint """
     c = PeekabooCacheResponder(config)
     c.loop()
+
+
+if __name__ == "__main__":
+    main()
