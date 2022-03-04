@@ -1,5 +1,7 @@
 # Extractor
 
+[![Container Images](https://github.com/michaelweiser/extractor/actions/workflows/container-image-publish.yml/badge.svg)](https://github.com/michaelweiser/extractor/actions/workflows/container-image-publish.yml)
+
 This is a Karton-based archive extractor for use with Peekaboo.
 
 [![](docs/extractor.svg)](docs/extractor.svg?raw=true)
