@@ -47,8 +47,7 @@ services:
     env_file:
       - docker-compose.env
   extractor-api:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     env_file:
@@ -56,48 +55,42 @@ services:
     ports:
       - "127.0.0.1:8200:8200"
   extractor-deduper:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     entrypoint: /opt/extractor/bin/extractor-deduper
     env_file:
       - docker-compose.env
   extractor-cache-responder:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     entrypoint: /opt/extractor/bin/extractor-cache-responder
     env_file:
       - docker-compose.env
   extractor-peekaboo-submitter:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     entrypoint: /opt/extractor/bin/extractor-peekaboo-submitter
     env_file:
       - docker-compose.env
   extractor-poker:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     entrypoint: /opt/extractor/bin/extractor-poker
     env_file:
       - docker-compose.env
   extractor-peekaboo-tracker:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     entrypoint: /opt/extractor/bin/extractor-peekaboo-tracker
     env_file:
       - docker-compose.env
   extractor-correlator:
-    image: extractor
-    build: .
+    image: ghcr.io/michaelweiser/extractor:main
     depends_on:
       - karton-logs
     entrypoint: /opt/extractor/bin/extractor-correlator

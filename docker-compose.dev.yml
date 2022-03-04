@@ -4,9 +4,28 @@ services:
   extractor-dummy-peekaboo-api:
     image: extractor-dummy-peekaboo-api
     build: dev
+  extractor-api:
+    image: extractor
+    build: .
+  extractor-deduper:
+    image: extractor
+    build: .
+  extractor-cache-responder:
+    image: extractor
+    build: .
   extractor-peekaboo-submitter:
+    image: extractor
+    build: .
     env_file:
       - docker-compose.dev.env
+  extractor-poker:
+    image: extractor
+    build: .
   extractor-peekaboo-tracker:
+    image: extractor
+    build: .
     env_file:
       - docker-compose.dev.env
+  extractor-correlator:
+    image: extractor
+    build: .
