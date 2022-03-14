@@ -63,7 +63,9 @@ jobs:
           [ "$try" -lt 320 ] || exit 1
 
       - name: Get logs
+        if: always()
         run: docker-compose logs
 
       - name: Bring down the environment
+        if: always()
         run: docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
