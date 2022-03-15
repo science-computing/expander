@@ -134,12 +134,14 @@ class DelayingKarton(karton.core.Karton):
         self.backend.set_consumer_identity(self.identity)
 
         # MOD1: add additional identities for delaying tasks
+        bind_redises = []
         for delay_queue in self.delay_queues:
+            identity = self.delay_identity_template % delay_queue
             filters = self.delay_filters[delay_queue]
             self.log.info("Binding on delay queue: %s", filters)
 
             bind = karton.core.backend.KartonBind(
-                identity=self.delay_identity_template % delay_queue,
+                identity=identity,
                 info=f"Bind for delayed tasks",
                 version=karton.core.__version__.__version__,
                 filters=filters,
@@ -148,6 +150,12 @@ class DelayingKarton(karton.core.Karton):
 
             # make these jobs be queued and routed to us as well
             self.backend.register_bind(bind)
+
+            # create and keep around another redis connection to get us listed
+            # as online consumer
+            bind_redis = self.backend.make_redis(self.config)
+            bind_redis.client_setname(identity)
+            bind_redises.append(bind_redis)
 
         try:
             last_switch = datetime.datetime.now(datetime.timezone.utc)
