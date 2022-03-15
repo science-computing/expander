@@ -1,0 +1,17 @@
+[Unit]
+Description=Karton dashboard service
+After=network.target redis.service minio.service
+Requires=redis.service minio.service
+
+[Service]
+Environment=KARTON_MINIO_ACCESS_KEY=karton-test-access
+Environment=KARTON_MINIO_SECRET_KEY=karton-test-key
+Environment=KARTON_MINIO_ADDRESS=127.0.0.1
+Environment=KARTON_MINIO_BUCKET=karton
+Environment=KARTON_REDIS_HOST=127.0.0.1
+ExecStart=/opt/extractor/bin/karton-dashboard run
+Restart=on-failure
+User=extractor
+
+[Install]
+WantedBy=multi-user.target

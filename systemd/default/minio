@@ -1,0 +1,5 @@
+MINIO_ADDRESS="127.0.0.1:9000"
+MINIO_CONSOLE_ADDRESS="127.0.0.1:9001"
+MINIO_ROOT_USER=karton-test-access
+MINIO_ROOT_PASSWORD=karton-test-key
+MINIO_VOLUMES="/var/lib/minio/data"
