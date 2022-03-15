@@ -54,21 +54,6 @@ class ExtractorPoker(DelayingKarton):
         super().__init__(
             config=config, identity=identity, backend=backend, timeout=timeout)
 
-    def set_backend_delay_identity(self):
-        delay_queue  = self.delay_queues[self.current_delay_queue]
-        delay_filters =  self.delay_filters[delay_queue]
-
-        # extractor.poker.delay-[one,two]
-        delay_identity = self.delay_identity_template % delay_queue
-        self.backend.set_delay_identity(delay_filters, delay_identity)
-
-    def update_delay_queue(self):
-        self.current_delay_queue = (self.current_delay_queue + 1
-            ) % len(self.delay_queues)
-        self.next_delay_queue = (self.current_delay_queue + 1
-            ) % len(self.delay_queues)
-        self.set_backend_delay_identity()
-
     def process(self, task: karton.core.Task) -> None:
         state = task.headers.get("state")
         if state is None:
@@ -263,10 +248,5 @@ class ExtractorPoker(DelayingKarton):
             task.root_uid, task.uid, state)
 
 
-def main():
-    """ entrypoint """
-    ExtractorPoker.main()
-
-
 if __name__ == "__main__":
-    main()
+    ExtractorPoker.main()
