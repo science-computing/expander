@@ -1,9 +1,11 @@
 """ Common functionality used by multiple Kartons """
 
 import datetime
+import uuid
 
 import karton.core
 import karton.core.backend
+import karton.core.task
 
 
 class DelayedTask(karton.core.Task):
@@ -36,17 +38,25 @@ class DelayedTask(karton.core.Task):
 
 
 class DelayingKartonBackend(karton.core.backend.KartonBackend):
-    def __init__(self, config):
+    def __init__(self, config, sync_identity=None):
         super().__init__(config)
         self.delay_filters = None
         self.delay_identity = None
+        self.sync_identity = sync_identity
 
     def set_delay_identity(self, delay_filters, delay_identity):
         self.delay_filters = delay_filters
         self.delay_identity = delay_identity
 
     def get_queue_names(self, identity):
-        queues = super().get_queue_names(identity)
+        queues = []
+
+        # do not let delay queue switch syncs starve due to very long-running
+        # normal tasks and incidentally avoid switching races between instances
+        if self.sync_identity is not None:
+            queues.extend(super().get_queue_names(self.sync_identity))
+
+        queues.extend(super().get_queue_names(identity))
 
         if self.delay_identity is not None:
             queues.extend(super().get_queue_names(self.delay_identity))
@@ -79,9 +89,15 @@ class DelayingKarton(karton.core.Karton):
     def __init__(self, config=None, identity=None, backend=None, timeout=1):
         self.timeout = timeout
 
+        self.sync_identity = self.identity + ".delay-sync-%s" % uuid.uuid4()
+        self.sync_task_type = self.identity + "-delay-sync"
+        self.sync_headers = {"type": self.sync_task_type}
+        self.sync_filters = [self.sync_headers]
+
         # inject our delaying backend by default
         if backend is None:
-            backend = DelayingKartonBackend(config)
+            backend = DelayingKartonBackend(
+                config, sync_identity=self.sync_identity)
 
         super().__init__(config=config, identity=identity, backend=backend)
 
@@ -109,9 +125,12 @@ class DelayingKarton(karton.core.Karton):
         delay_identity = self.delay_identity_template % delay_queue
         self.backend.set_delay_identity(delay_filters, delay_identity)
 
-    def update_delay_queue(self):
-        self.current_delay_queue = (
-            self.current_delay_queue + 1) % len(self.delay_queues)
+    def update_delay_queue(self, delay_queue=None):
+        """ Switch to the next or an explicitly specified delay queue. """
+        if delay_queue is None:
+            delay_queue = self.current_delay_queue + 1
+
+        self.current_delay_queue = delay_queue % len(self.delay_queues)
         self.next_delay_queue = (
             self.current_delay_queue + 1) % len(self.delay_queues)
         self.set_backend_delay_identity()
@@ -157,6 +176,20 @@ class DelayingKarton(karton.core.Karton):
             bind_redis.client_setname(identity)
             bind_redises.append(bind_redis)
 
+        # MOD4: add additional identity for syncing delayers
+        self.log.info("Binding on sync filters: %s", self.sync_filters)
+        bind = karton.core.backend.KartonBind(
+            identity=self.sync_identity,
+            info="Bind for delayer sync",
+            version=karton.core.__version__.__version__,
+            filters=self.sync_filters,
+            persistent=True,
+            service_version=self.__class__.version)
+        self.backend.register_bind(bind)
+        bind_redis = self.backend.make_redis(self.config)
+        bind_redis.client_setname(self.sync_identity)
+        bind_redises.append(bind_redis)
+
         try:
             last_switch = datetime.datetime.now(datetime.timezone.utc)
             timeoutdelta = datetime.timedelta(seconds=self.timeout)
@@ -168,8 +201,6 @@ class DelayingKarton(karton.core.Karton):
                 # MOD2: provide shorter timeout to task dequeue
                 task = self.backend.consume_routed_task(
                     self.identity, self.timeout)
-                if task:
-                    self.internal_process(task)
 
                 now = datetime.datetime.now(datetime.timezone.utc)
                 if not task or last_switch + timeoutdelta < now:
@@ -179,9 +210,58 @@ class DelayingKarton(karton.core.Karton):
                     # expired.  Therefore we independently track the timeout
                     # between switches.
                     self.update_delay_queue()
-                    last_switch = datetime.datetime.now(datetime.timezone.utc)
-                    continue
+                    last_switch = now
+
+                    # tell our colleagues that we've just switched delay
+                    # queues. This is somewhat inefficient as it (worst case)
+                    # creates n^2 tasks (with n the number of delaying karton
+                    # instances) for every delay queue switch. But it is
+                    # required to keep everyone on the same delay queue because
+                    # otherwise it can happen that two instances listening to
+                    # different delay queues flood each other with delayed
+                    # tasks as fast as they can, undermining the whole aspect
+                    # of delaying them. For now we don't try to be smart about
+                    # this and KISS until it turns out to be a problem.
+                    delay_queue = self.delay_queues[self.current_delay_queue]
+                    self.current_task = None
+                    self.send_task(karton.core.Task(
+                        headers=self.sync_headers,
+                        payload={"delay-queue": delay_queue}))
+
+                    if not task:
+                        continue
+
+                    # fall on through
+
+                if task:
+                    task_type = task.headers.get("type")
+                    if task_type == self.sync_task_type:
+                        self.backend.set_task_status(
+                            task, karton.core.task.TaskState.FINISHED)
+
+                        advertised_delay_queue = task.get_payload("delay-queue")
+                        if advertised_delay_queue not in self.delay_queues:
+                            self.log.warning(
+                                "Unknown delay queue %s",
+                                advertised_delay_queue)
+                            continue
+
+                        # try to sync up switch times (modulo travel delay of
+                        # the task)
+                        last_switch = now
+
+                        new_queue = self.delay_queues.index(
+                            advertised_delay_queue)
+                        if new_queue == self.current_delay_queue:
+                            continue
+
+                        self.update_delay_queue(new_queue)
+                        continue
+
+                    self.internal_process(task)
 
         except KeyboardInterrupt as e:
             self.log.info("Hard shutting down!")
             raise e
+        finally:
+            self.backend.unregister_bind(self.sync_identity)
