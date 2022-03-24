@@ -2,6 +2,8 @@
 
 See documentation for details.
 
-## devel
+## 0.0.2
+
+## 0.0.1
 
 - Initial development
