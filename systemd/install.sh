@@ -6,7 +6,6 @@ apt-get install redis
 virtualenv /opt/extractor
 /opt/extractor/bin/pip install ..
 /opt/extractor/bin/pip install karton-dashboard karton-classifier karton-archive-extractor
-/opt/extractor/bin/pip install itsdangerous==2.0.1
 
 mkdir /opt/extractor/etc
 cp ../extractor.ini /opt/extractor/etc/
