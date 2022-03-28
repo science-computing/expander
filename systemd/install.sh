@@ -11,11 +11,18 @@ mkdir /opt/extractor/etc
 cp ../extractor.ini /opt/extractor/etc/
 useradd -m extractor
 
+mkdir -p /var/lib/minio/data
+useradd -m minio-user
+chown -R minio-user: /var/lib/minio/data
+
 wget https://dl.min.io/server/minio/release/linux-amd64/minio_20220314182524.0.0_amd64.deb -O minio.deb
 dpkg -i minio.deb
 rm minio.deb
 
 cp default/minio /etc/default
+
+systemctl restart minio
+
 cp -r *.service* /etc/systemd/system
 
 # brace expansion is a bashism
