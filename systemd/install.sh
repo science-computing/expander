@@ -1,7 +1,7 @@
 #!/bin/bash
 
-apt-get update redis
-apt-get install redis
+apt-get update
+apt-get install redis virtualenv p7zip-full rar unace-nonfree cabextract lzip
 
 virtualenv /opt/extractor
 /opt/extractor/bin/pip install ..
