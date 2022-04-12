@@ -1,0 +1,41 @@
+[minio]
+localhost ansible_connection=local
+
+[redis]
+localhost ansible_connection=local
+
+[karton_system]
+localhost ansible_connection=local
+
+[karton_logger]
+localhost ansible_connection=local
+
+[karton_classifier]
+localhost ansible_connection=local
+
+[karton_archive_extractor]
+localhost ansible_connection=local
+
+[karton_dashboard]
+localhost ansible_connection=local
+
+[extractor_deduper]
+localhost ansible_connection=local
+
+[extractor_cache_responder]
+localhost ansible_connection=local
+
+[extractor_peekaboo_submitter]
+localhost ansible_connection=local
+
+[extractor_poker]
+localhost ansible_connection=local
+
+[extractor_peekaboo_tracker]
+localhost ansible_connection=local
+
+[extractor_correlator]
+localhost ansible_connection=local
+
+[extractor_api]
+localhost ansible_connection=local

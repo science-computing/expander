@@ -1,0 +1,84 @@
+name: Ansible
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out extractor
+        uses: actions/checkout@v2
+
+      - name: Install required roles
+        run: ansible-galaxy role install atosatto.minio geerlingguy.redis
+
+      - name: Run ansible
+        run: |
+          cd ansible
+          ansible-playbook -e 'ansible_python_interpreter=/usr/bin/python3' \
+            -b -i hosts extractor.yml
+
+      - name: Install dummy Peekaboo API
+        run: |
+          sudo apt-get update && sudo apt-get install python3-virtualenv
+          sudo virtualenv /opt/peekaboo
+          sudo /opt/peekaboo/bin/pip3 install sanic schema
+          sudo cp dev/dummy_peekaboo_api.py \
+            /opt/peekaboo/bin/dummy_peekaboo_api.py
+          sudo chmod 755 /opt/peekaboo/bin/dummy_peekaboo_api.py
+          sudo groupadd peekaboo
+          sudo useradd -g peekaboo -m -d /var/lib/peekaboo peekaboo
+
+          cat <<EOF | sudo tee /etc/systemd/system/dummy-peekaboo-api.service
+          [Unit]
+          Description=Peekaboo API
+          After=network.target
+
+          [Service]
+          ExecStart=/opt/peekaboo/bin/python3 \
+            /opt/peekaboo/bin/dummy_peekaboo_api.py
+          User=peekaboo
+          EOF
+
+      - name: Start dummy Peekaboo API
+        run: |
+          sudo systemctl daemon-reload
+          sudo systemctl start dummy-peekaboo-api
+          sleep 1
+          sudo journalctl -u dummy-peekaboo-api
+
+      # curl and jq are preinstalled on Github ubuntu-latest runner
+      - name: Prepare test job
+        run: |
+          zip -9r inside.zip README.md docs
+          zip -9r outside.zip extractor inside.zip
+
+      - name: Submit and wait for test job
+        run: |
+          echo "Submitting test job..."
+          job_id=$(curl -s -F file=@outside.zip \
+              http://127.0.0.1:8200/v1/scan | \
+            jq -r .job_id)
+
+          echo "Waiting for job to finish..."
+          for try in $(seq 1 320) ; do
+            code=$(curl -s -w "%{stderr}%{http_code}" \
+              http://127.0.0.1:8200/v1/report/"$job_id" 2>&1 >/dev/null)
+            [ "$code" -eq 404 ] || break
+            sleep 1
+            echo -n "."
+          done
+          echo
+
+          echo "Job report:"
+          curl -s http://127.0.0.1:8200/v1/report/$job_id | jq
+          [ "$try" -lt 320 ] || exit 1
+
+      - name: Get logs
+        if: always()
+        run: journalctl -n 2500

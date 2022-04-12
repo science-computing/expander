@@ -1,0 +1,12 @@
+[Unit]
+Description={{ karton_service }} service
+After=network.target redis.service minio.service
+Requires=redis.service minio.service
+
+[Service]
+ExecStart={{ karton_service_command | trim }}
+Restart=on-failure
+User={{ karton_user }}
+
+[Install]
+WantedBy=multi-user.target

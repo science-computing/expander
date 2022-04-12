@@ -1,0 +1,10 @@
+---
+virtualenv_os_package: python3-virtualenv
+
+karton_os_dependencies:
+  "karton-archive-extractor":
+    - p7zip-full
+    - rar
+    - unace-nonfree
+    - cabextract
+    - lzip

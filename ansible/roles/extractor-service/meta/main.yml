@@ -1,0 +1,6 @@
+galaxy_info:
+  author: Michael Weiser
+  description: Install an extractor service
+  issue_tracker_url: https://github.com/michaelweiser/extractor
+  license: license GPL-3.0-only
+  min_ansible_version: 2.9

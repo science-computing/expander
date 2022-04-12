@@ -1,0 +1,22 @@
+---
+minio_secret_key: "{{ lookup('password',
+  'minio_secret_key length=15 chars=ascii_letters') }}"
+
+# configure consistent minio port
+minio_server: "localhost"
+minio_listen_address: "127.0.0.1"
+minio_port: 9091
+
+# minio role
+minio_server_addr: "{{ minio_listen_address }}:{{ minio_port }}"
+
+# karton-service role
+minio_address: "{{ minio_server }}:{{ minio_port }}"
+
+# configure consistent redis port
+# redis role
+redis_bind_interface: "127.0.0.1"
+# karton-service role
+redis_host: "localhost"
+# both
+redis_port: 6379

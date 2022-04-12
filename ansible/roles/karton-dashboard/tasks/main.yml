@@ -1,0 +1,50 @@
+---
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: "Install OS package {{ virtualenv_os_package }}"
+  package:
+    name:
+    - "{{ virtualenv_os_package }}"
+
+- name: "Install karton_dashboard into /opt/karton-dashboard"
+  pip:
+    name: karton-dashboard
+    state: latest
+    virtualenv: /opt/karton-dashboard
+    virtualenv_python: python3
+
+- name: "Create group karton-dashboard"
+  group:
+    name: karton-dashboard
+    state: present
+
+- name: "Create user karton-dashboard"
+  user:
+    name: karton-dashboard
+    group: karton-dashboard
+    home: /var/lib/karton-dashboard
+
+- name: "Create defaults file /etc/default/karton-dashboard"
+  template:
+    src: karton-dashboard.default.j2
+    dest: /etc/default/karton-dashboard
+    owner: root
+    group: karton-dashboard
+    mode: 0640
+
+- name: "Create the karton-dashboard systemd service unit"
+  copy:
+    src: karton-dashboard.service
+    dest: "/etc/systemd/system/karton-dashboard.service"
+    owner: root
+    group: root
+  when: ansible_service_mgr == "systemd"
+
+- name: "Enable and start karton-dashboard instances"
+  systemd:
+    name: karton-dashboard
+    state: started
+    enabled: true
+    daemon_reload: yes
+  when: ansible_service_mgr == "systemd"

@@ -1,0 +1,31 @@
+---
+karton_service: karton-classifier
+karton_package: "{{ karton_service }}"
+
+karton_os_dependencies: []
+
+karton_user: "{{ karton_service }}"
+karton_group: "{{ karton_service }}"
+karton_user_home: "/var/lib/{{ karton_user }}"
+
+karton_venv: "/opt/{{ karton_service }}"
+karton_config_dir: "{{ karton_venv }}/etc"
+karton_config_file: "{{ karton_config_dir }}/karton.ini"
+karton_bindir: "{{ karton_venv }}/bin"
+karton_extra_args: ""
+karton_command: "{{ karton_service }}"
+karton_service_command: "{{ karton_bindir }}/{{ karton_command
+  }} --config-file {{ karton_config_file }} {{ karton_extra_args }}"
+
+karton_instances: 3
+
+karton_log_level: INFO
+
+minio_access_key: karton
+minio_secret_key: secret
+minio_address: localhost:9000
+minio_bucket: karton
+minio_secure: 0
+
+redis_host: localhost
+redis_port: 6379

@@ -1,0 +1,13 @@
+[Unit]
+Description=Karton dashboard service
+After=network.target redis.service minio.service
+Requires=redis.service minio.service
+
+[Service]
+EnvironmentFile=-/etc/default/karton-dashboard
+ExecStart=/opt/extractor/bin/karton-dashboard run
+Restart=on-failure
+User=karton-dashboard
+
+[Install]
+WantedBy=multi-user.target
