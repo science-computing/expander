@@ -139,8 +139,7 @@ class ExtractorDeduper(DelayingKarton):
             set_at_payload = task.get_payload("set-at")
             if set_at_payload is None:
                 self.log.warning(
-                    "%s: Dropping dedupe hold without criteria-key or set-at",
-                    task.root_uid)
+                    "%s: Dropping dedupe hold without set-at", task.root_uid)
                 return
 
             set_at = datetime.datetime.fromisoformat(set_at_payload)
