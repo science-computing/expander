@@ -146,8 +146,6 @@ class ExtractorDeduper(DelayingKarton):
 
             # keep jobs from starving
             if set_at + self.cutoff <= now:
-                task = task.derive_task(self.deduped_headers)
-                self.send_task(task)
                 self.log.info(
                     "%s: Job has potentially been blocking duplicates for %s "
                     "now - clearing hold", task.root_uid, now - set_at)
