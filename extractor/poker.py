@@ -136,9 +136,20 @@ class ExtractorPoker(DelayingKarton):
             jobs_left = self.backend.redis.hincrby(
                 self.jobs_key, task.root_uid, -1)
             if jobs_left < 0:
-                self.log.warning(
-                    "%s:%s: Job count corrupted (%d) - dropping job",
-                    task.root_uid, task.uid, jobs_left)
+                # NOTE: The count will become negative legitimately if two
+                # pokers had been racing each other in concluding whether they
+                # were handling the last task of this job and one of them poked
+                # the correlator and subsequently deleted the jobs key. The
+                # other would have reincremented it (which got lost by the
+                # deletion) and generated the done-recheck which we're
+                # processing now. Due to the nonexistance of the jobs key, the
+                # decrement above produced a negative key value. We detect this
+                # to prevent a duplicate correlator poke and delete the key
+                # again for cleanup.
+                self.log.debug(
+                    "%s:%s: Job count went negative through race with "
+                    "colleague (%d) - refraining from poking the correlator "
+                    "again", task.root_uid, task.uid, jobs_left)
                 self.backend.redis.hdel(self.jobs_key, task.root_uid)
                 return
 
