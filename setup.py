@@ -80,6 +80,7 @@ setuptools.setup(
         ("share/doc/expander", [
             "README.md",
             "CHANGELOG.md",
+            "docs/expander-logo.svg",
             "docs/expander-schematic.svg",
         ]),
     ],

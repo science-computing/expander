@@ -3,6 +3,8 @@
 [![CI](https://github.com/science-computing/expander/actions/workflows/container-ci.yml/badge.svg)](https://github.com/science-computing/expander/actions/workflows/container-ci.yml)
 [![Container Images](https://github.com/science-computing/expander/actions/workflows/container-image-publish.yml/badge.svg)](https://github.com/science-computing/expander/actions/workflows/container-image-publish.yml)
 
+[![](docs/expander-logo.svg)](docs/expander-logo.svg)
+
 This is a Karton-based archive expander for use with Peekaboo.
 
 [![](docs/expander-schematic.svg)](docs/expander-schematic.svg?raw=true)
