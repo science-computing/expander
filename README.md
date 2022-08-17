@@ -5,7 +5,8 @@
 
 [![](docs/expander-logo.svg)](docs/expander-logo.svg)
 
-This is a Karton-based archive expander for use with Peekaboo.
+This is a Karton-based archive extractor, job submitter and tracker as well as
+results correlator for use with Peekaboo.
 
 [![](docs/expander-schematic.svg)](docs/expander-schematic.svg?raw=true)
 
