@@ -1,0 +1,48 @@
+---
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: "Install OS package {{ virtualenv_os_package }}"
+  package:
+    name: "{{ virtualenv_os_package }}"
+
+- name: "Install expander into {{ expander_venv }}"
+  pip:
+    # no release on pypi yet
+    chdir: ..
+    name: .
+    state: latest
+    virtualenv: "{{ expander_venv }}"
+    virtualenv_python: python3
+
+- name: "Create configuration directory {{ expander_config_dir }}"
+  file:
+    dest: "{{ expander_config_dir }}"
+    state: directory
+
+- name: "Create group {{ expander_group }}"
+  group:
+    name: "{{ expander_group }}"
+    state: present
+
+- name: "Create user {{ expander_user }}"
+  user:
+    name: "{{ expander_user }}"
+    group: "{{ expander_group }}"
+    home: "{{ expander_user_home }}"
+
+- name: "Create config file {{ expander_config_file }}"
+  template:
+    src: expander.ini.j2
+    dest: "{{ expander_config_file }}"
+    owner: root
+    group: "{{ expander_group }}"
+    mode: 0640
+
+- name: Manage service
+  include_tasks: manage-service.yml
+  when: ansible_service_mgr == "systemd" and not expander_instances
+
+- name: Manage service instances
+  include_tasks: manage-service-instances.yml
+  when: ansible_service_mgr == "systemd" and expander_instances

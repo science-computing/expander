@@ -1,0 +1,53 @@
+# karton config
+[logging]
+level = {{ karton_log_level }}
+
+[minio]
+access_key = {{ minio_access_key }}
+secret_key = {{ minio_secret_key }}
+address = {{ minio_address }}
+bucket = {{ minio_bucket }}
+secure = {{ minio_secure }}
+
+[redis]
+host={{ redis_host }}
+port={{ redis_port }}
+
+# our config
+# used by multiple components
+[expander]
+use_deduper = {{ expander_use_deduper }}
+use_cache = {{ expander_use_cache }}
+reports_key = {{ expander_reports_key }}
+job_cache_key = {{ expander_job_cache_key }}
+correlator_reports_identity = {{ expander_correlator_reports_identity }}
+
+# used by peekaboo components
+[expanderpeekaboo]
+url = {{ expander_peekaboo_url }}
+backoff = {{ expander_peekaboo_backoff }}
+retries = {{ expander_peekaboo_retries }}
+
+# individual components
+[expanderpeekabootracker]
+job_age_cutoff = {{ expander_peekaboo_tracker_job_age_cutoff }}
+
+[expandercacheresponder]
+age_out_interval = {{ expander_cache_responder_age_out_interval }}
+max_age = {{ expander_cache_responder_max_age }}
+
+[expanderdeduper]
+running_key = {{ expander_deduper_running_key }}
+recheck_interval = {{ expander_deduper_recheck_interval }}
+cutoff = {{ expander_deduper_cutoff }}
+gc_interval = {{ expander_deduper_gc_interval }}
+
+[expanderpoker]
+jobs_key = {{ expander_poker_jobs_key }}
+recheck_cutoff = {{ expander_poker_recheck_cutoff }}
+poking_delay = {{ expander_poker_poking_delay }}
+timeout = {{ expander_poker_timeout }}
+
+[expanderapi]
+host = {{ expander_api_host }}
+port = {{ expander_api_port }}

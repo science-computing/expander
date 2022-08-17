@@ -1,6 +1,6 @@
 galaxy_info:
   author: Michael Weiser
   description: Install a standard Karton service
-  issue_tracker_url: https://github.com/michaelweiser/extractor
+  issue_tracker_url: https://github.com/science-computing/expander
   license: license GPL-3.0-only
   min_ansible_version: 2.9

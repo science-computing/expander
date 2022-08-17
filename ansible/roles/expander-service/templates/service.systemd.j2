@@ -1,0 +1,12 @@
+[Unit]
+Description={{ expander_service }} service
+After=network.target redis.service minio.service
+Requires=redis.service minio.service
+
+[Service]
+ExecStart={{ expander_service_command }}
+Restart=on-failure
+User={{ expander_user }}
+
+[Install]
+WantedBy=multi-user.target

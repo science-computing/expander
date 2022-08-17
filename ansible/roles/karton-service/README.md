@@ -57,4 +57,4 @@ GPL-3.0-only
 Author Information
 ------------------
 
-https://github.com/michaelweiser/extractor
+https://github.com/science-computing/expander

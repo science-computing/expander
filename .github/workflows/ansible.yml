@@ -11,7 +11,7 @@ jobs:
   ansible:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out extractor
+      - name: Check out expander
         uses: actions/checkout@v2
 
       - name: Install required roles
@@ -21,7 +21,7 @@ jobs:
         run: |
           cd ansible
           ansible-playbook -e 'ansible_python_interpreter=/usr/bin/python3' \
-            -b -i hosts extractor.yml
+            -b -i hosts expander.yml
 
       - name: Install dummy Peekaboo API
         run: |
@@ -56,7 +56,7 @@ jobs:
       - name: Prepare test job
         run: |
           zip -9r inside.zip README.md docs
-          zip -9r outside.zip extractor inside.zip
+          zip -9r outside.zip expander inside.zip
 
       - name: Submit and wait for test job
         run: |

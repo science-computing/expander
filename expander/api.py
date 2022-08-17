@@ -1,31 +1,45 @@
-#!/usr/bin/env python
-""" A dummy peekaboo REST API """
+""" A REST API for submitting samples """
 
 import argparse
 import asyncio
 import base64
 import binascii
 import email.utils
+import json
 import logging
-import random
 import signal
+import sys
 import urllib.parse
 
+import karton.core
 import sanic
 import sanic.constants
 import sanic.headers
 import sanic.response
 import schema
 
+from . import __version__
+
 logger = logging.getLogger(__name__)
 
 
-class DummyPeekabooAPI:
-    """ dummy peekaboo api """
-    def __init__(self, host="127.0.0.1", port=8100, request_queue_size=100):
+class ExpanderAPI:
+    """ expander api """
+    def __init__(self, karton_config, host="127.0.0.1", port=8200, request_queue_size=100):
         logger.debug('Starting up server.')
-        self.app = sanic.Sanic("PeekabooAV", configure_logging=False)
+        self.app = sanic.Sanic("Expander-API", configure_logging=False)
         self.app.config.FALLBACK_ERROR_FORMAT = "json"
+
+        self.karton = karton.core.Producer(
+            karton_config, identity="expander.api")
+        self.use_cache = config.config.getboolean(
+            "expander", "use_cache", fallback=True)
+        self.use_deduper = config.config.getboolean(
+            "expander", "use_deduper", fallback=True)
+        self.reports_key = config.config.get(
+            "expander", "reports_key", fallback="expander.reports")
+        host = config.config.get("expanderapi", "host", fallback=host)
+        port = config.config.getint("expanderapi", "port", fallback=port)
 
         # silence sanic to a reasonable amount
         logging.getLogger('sanic.root').setLevel(logging.WARNING)
@@ -37,7 +51,6 @@ class DummyPeekabooAPI:
             backlog=request_queue_size,
             asyncio_server_kwargs=dict(start_serving=False))
         self.server = None
-
         # remember for diagnostics
         self.host = host
         self.port = port
@@ -47,17 +60,14 @@ class DummyPeekabooAPI:
         self.app.add_route(self.scan, "/v1/scan", methods=['POST'])
         self.app.add_route(self.scan2, "/v1/scan2", methods=['POST'])
         self.app.add_route(
-            self.report, '/v1/report/<job_id:int>', methods=['GET'])
-
-        self.jobs = []
-        self.next_job_id = 1
+            self.report, '/v1/report/<job_id:uuid>', methods=['GET'])
 
     async def hello(self, _):
         """ hello endpoint as fallback and catch all
 
         @returns: hello world json response
         """
-        return sanic.response.json({'hello': 'PeekabooAV'})
+        return sanic.response.json({'hello': 'Expander-API'})
 
     async def ping(self, _):
         """ ping endpoint for diagnostics
@@ -79,8 +89,11 @@ class DummyPeekabooAPI:
         # text fields and try to decode them using the form charset or UTF-8 as
         # a fallback and cause errors such as: UnicodeDecodeError: 'utf-8'
         # codec can't decode byte 0xc0 in position 1: invalid start byte
+        content_type = request.headers.getone(
+            'content-type', sanic.constants.DEFAULT_HTTP_CONTENT_TYPE
+        )
         content_type, parameters = sanic.headers.parse_content_header(
-            request.content_type)
+            content_type)
 
         # application/x-www-form-urlencoded is inefficient at transporting
         # binary data. Also it needs a separate field to transfer the filename.
@@ -244,17 +257,32 @@ class DummyPeekabooAPI:
                                     email
         @type content_disposition: str
         """
-        del file_content
-        del file_name
-        del content_type
-        del content_disposition
+        resource = karton.core.Resource(file_name, content=file_content)
 
-        job_id = self.next_job_id
-        self.jobs.append(job_id)
-        self.next_job_id += 1
+        headers = {"type": "sample", "kind": "raw"}
+        if self.use_cache or self.use_deduper:
+            headers = {"type": "expander-sample", "state": "new"}
+
+        task = karton.core.Task(
+            headers=headers,
+            payload={
+                "sample": resource,
+                "root-sample": True,
+            })
+
+        # do not use persistent payload here because they loose their meaning
+        # for additional samples extracted from this, e.g. archives
+        if content_type is not None:
+            task.add_payload("content-type", content_type)
+        if content_disposition is not None:
+            task.add_payload("content-disposition", content_disposition)
+
+        self.karton.send_task(task)
+
+        logger.debug('%s: Sent to Karton as job %s', task.uid, task.uid)
 
         # send answer to client
-        return sanic.response.json({'job_id': job_id}, 200)
+        return sanic.response.json({'job_id': task.uid}, 200)
 
     async def report(self, _, job_id):
         """ report endpoint for report retrieval by job ID
@@ -262,50 +290,25 @@ class DummyPeekabooAPI:
         @param request: sanic request object
         @type request: sanic.Request
         @param job_id: job ID extracted from endpoint path
-        @type job_id: int
+        @type job_id: uuid.UUID
         @returns: report json response
         """
         if not job_id:
             return sanic.response.json(
                 {'message': 'job ID missing from request'}, 400)
 
-        # job has to be known, then it has a chance of 33% of being finished
-        if job_id not in self.jobs or random.randint(0, 2):
-            logger.debug('No analysis result yet for job %d', job_id)
+        report_json = self.karton.backend.redis.hget(
+            self.reports_key, str(job_id))
+        if not report_json:
+            logger.debug('No analysis result yet for job %s', job_id)
             return sanic.response.json(
-                {'message': 'No analysis result yet for job %d' % job_id}, 404)
+                {'message': 'No analysis result yet for job %s' % job_id}, 404)
 
-        results = ["bad", "failed", "ignored", "unknown"]
-        reasons = {
-            "bad": [
-                "Cuckoo score >= 4.0: 10.0",
-                "The expression (3) classified the sample as Result.bad",
-            ],
-            "failed": [
-                "Behavioral analysis by Cuckoo has produced an error and did "
-                    "not finish successfully",
-                "Rule aborted with error"
-            ],
-            "ignored": [
-                "File type is on whitelist",
-                "The expression (0) classified the sample as Result.ignored",
-            ],
-            "unknown": [
-                "File type is not on the list of types to analyse",
-                "File does not seem to exhibit recognizable malicious "
-                    "behaviour",
-            ],
-        }
+        report = json.loads(report_json)
 
-        result = results[random.randint(0, len(results) - 1)]
-        reason = reasons[result][random.randint(0, len(reasons[result]) - 1)]
+        # apply schema here
 
-        return sanic.response.json({
-            'result': result,
-            'reason': reason,
-            # FIXME: depends on saving the report to the database
-            # 'report': report,
-            }, 200)
+        return sanic.response.json(report, 200)
 
     async def serve(self):
         """ Serves requests until shutdown is requested from the outside. """
@@ -317,7 +320,7 @@ class DummyPeekabooAPI:
             await self.server.startup()
 
         await self.server.start_serving()
-        logger.info('Peekaboo server is now listening on %s:%d',
+        logger.info('Expander API server is now listening on %s:%d',
                     self.host, self.port)
         await self.server.wait_closed()
         logger.debug('Server shut down.')
@@ -333,13 +336,13 @@ class DummyPeekabooAPI:
 logging.basicConfig()
 logger.setLevel(logging.DEBUG)
 
-parser = argparse.ArgumentParser(description=DummyPeekabooAPI.__doc__)
-parser.add_argument("--host", default="127.0.0.1", help="bind address")
-parser.add_argument("--port", type=int, default=8100, help="bind port")
+parser = argparse.ArgumentParser(description=ExpanderAPI.__doc__)
+parser.add_argument("--version", action="version", version=__version__)
+parser.add_argument("--config-file", help="Alternative configuration path")
 args = parser.parse_args()
 
-api = DummyPeekabooAPI(args.host, args.port)
-
+config = karton.core.Config(args.config_file)
+api = ExpanderAPI(config)
 
 def signal_handler(sig):
     """ catch signal and call appropriate methods in registered listener

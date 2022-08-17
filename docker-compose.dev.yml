@@ -1,31 +1,31 @@
 version: '3'
 
 services:
-  extractor-dummy-peekaboo-api:
-    image: extractor-dummy-peekaboo-api
+  expander-dummy-peekaboo-api:
+    image: expander-dummy-peekaboo-api
     build: dev
-  extractor-api:
-    image: extractor
+  expander-api:
+    image: expander
     build: .
-  extractor-deduper:
-    image: extractor
+  expander-deduper:
+    image: expander
     build: .
-  extractor-cache-responder:
-    image: extractor
+  expander-cache-responder:
+    image: expander
     build: .
-  extractor-peekaboo-submitter:
-    image: extractor
-    build: .
-    env_file:
-      - docker-compose.dev.env
-  extractor-poker:
-    image: extractor
-    build: .
-  extractor-peekaboo-tracker:
-    image: extractor
+  expander-peekaboo-submitter:
+    image: expander
     build: .
     env_file:
       - docker-compose.dev.env
-  extractor-correlator:
-    image: extractor
+  expander-poker:
+    image: expander
+    build: .
+  expander-peekaboo-tracker:
+    image: expander
+    build: .
+    env_file:
+      - docker-compose.dev.env
+  expander-correlator:
+    image: expander
     build: .

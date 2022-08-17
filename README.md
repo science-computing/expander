@@ -1,11 +1,11 @@
-# Extractor
+# Expander
 
-[![CI](https://github.com/michaelweiser/extractor/actions/workflows/container-ci.yml/badge.svg)](https://github.com/michaelweiser/extractor/actions/workflows/container-ci.yml)
-[![Container Images](https://github.com/michaelweiser/extractor/actions/workflows/container-image-publish.yml/badge.svg)](https://github.com/michaelweiser/extractor/actions/workflows/container-image-publish.yml)
+[![CI](https://github.com/science-computing/expander/actions/workflows/container-ci.yml/badge.svg)](https://github.com/science-computing/expander/actions/workflows/container-ci.yml)
+[![Container Images](https://github.com/science-computing/expander/actions/workflows/container-image-publish.yml/badge.svg)](https://github.com/science-computing/expander/actions/workflows/container-image-publish.yml)
 
-This is a Karton-based archive extractor for use with Peekaboo.
+This is a Karton-based archive expander for use with Peekaboo.
 
-[![](docs/extractor.svg)](docs/extractor.svg?raw=true)
+[![](docs/expander-schematic.svg)](docs/expander-schematic.svg?raw=true)
 
 Submit jobs e.g. using curl:
 

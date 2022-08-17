@@ -2,20 +2,20 @@ FROM debian:bullseye-slim AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-WORKDIR /extractor
+WORKDIR /expander
 
 RUN apt-get -y update \
 	&& apt-get install -y \
 		python3-virtualenv
 
-COPY . /extractor/
-RUN virtualenv /opt/extractor \
-	&& /opt/extractor/bin/pip3 install . \
-	&& find /opt/extractor/lib -name "*.so" | xargs strip \
-	&& find /opt/extractor/lib -name "*.c" -delete
+COPY . /expander/
+RUN virtualenv /opt/expander \
+	&& /opt/expander/bin/pip3 install . \
+	&& find /opt/expander/lib -name "*.so" | xargs strip \
+	&& find /opt/expander/lib -name "*.c" -delete
 
 FROM debian:bullseye-slim
-COPY --from=build /opt/extractor/ /opt/extractor/
+COPY --from=build /opt/expander/ /opt/expander/
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y \
@@ -25,8 +25,8 @@ RUN apt-get update -y \
 	&& apt-get clean all \
 	&& find /var/lib/apt/lists -type f -delete
 
-RUN groupadd -g 1000 extractor
-RUN useradd -g 1000 -u 1000 -m -d /var/lib/extractor extractor
+RUN groupadd -g 1000 expander
+RUN useradd -g 1000 -u 1000 -m -d /var/lib/expander expander
 
-USER extractor
-ENTRYPOINT ["/opt/extractor/bin/extractor-api"]
+USER expander
+ENTRYPOINT ["/opt/expander/bin/expander-api"]

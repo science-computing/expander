@@ -9,9 +9,9 @@ Environment=KARTON_MINIO_SECRET_KEY=karton-test-key
 Environment=KARTON_MINIO_ADDRESS=127.0.0.1
 Environment=KARTON_MINIO_BUCKET=karton
 Environment=KARTON_REDIS_HOST=127.0.0.1
-ExecStart=/opt/extractor/bin/karton-dashboard run
+ExecStart=/opt/expander/bin/karton-dashboard run
 Restart=on-failure
-User=extractor
+User=expander
 
 [Install]
 WantedBy=multi-user.target

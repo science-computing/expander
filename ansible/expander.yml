@@ -1,0 +1,137 @@
+- name: "Install minio"
+  hosts: minio
+  tags: minio
+  become: true
+  roles:
+    - role: atosatto.minio
+  vars:
+    minio_server_datadirs:
+      - "/var/lib/minio"
+    minio_access_key: "karton"
+
+- name: "Install redis"
+  hosts: redis
+  tags: redis
+  become: true
+  roles:
+    - role: geerlingguy.redis
+
+- name: "Install Karton System"
+  hosts: karton_system
+  tags: karton-system
+  become: true
+  roles:
+    - role: karton-service
+  vars:
+    karton_service: "karton-system"
+    karton_package: "karton-core"
+    karton_extra_args: "--setup-bucket"
+
+- name: "Install Karton Logger"
+  hosts: karton_logger
+  tags: karton-logger
+  become: true
+  roles:
+    - role: karton-service
+  vars:
+    karton_service: "karton-logs"
+    karton_package: "karton-core"
+    karton_command: "karton"
+    karton_extra_args: "logs"
+    karton_instances: 1
+
+- name: "Install Karton Classifier"
+  hosts: karton_classifier
+  tags: karton-classifier
+  become: true
+  roles:
+    - role: karton-service
+
+- name: "Install Karton Archive Extractor"
+  hosts: karton_archive_extractor
+  tags: karton-archive-extractor
+  become: true
+  roles:
+    - role: karton-service
+  vars:
+    karton_service: "karton-archive-extractor"
+
+- name: "Install Karton Dashboard"
+  hosts: karton_dashboard
+  tags: karton-dashboard
+  become: true
+  roles:
+    - role: karton-dashboard
+
+- name: "Install Expander Deduper"
+  hosts: expander_deduper
+  tags: expander-deduper
+  become: true
+  roles:
+    - role: expander-service
+
+- name: "Install Expander Cache Responder"
+  hosts: expander_cache_responder
+  tags: expander-cache-responder
+  become: true
+  roles:
+    - role: expander-service
+  vars:
+    expander_service: expander-cache-responder
+
+- name: "Install Expander Peekaboo Submitter"
+  hosts: expander_peekaboo_submitter
+  tags: expander-peekaboo-submitter
+  become: true
+  roles:
+    - role: expander-service
+  vars:
+    expander_service: expander-peekaboo-submitter
+
+- name: "Install Expander Poker"
+  hosts: expander_poker
+  tags: expander-poker
+  become: true
+  roles:
+    - role: expander-service
+  vars:
+    expander_service: expander-poker
+
+- name: "Install Expander Peekaboo Tracker"
+  hosts: expander_peekaboo_tracker
+  tags: expander-peekaboo-tracker
+  become: true
+  roles:
+    - role: expander-service
+  vars:
+    expander_service: expander-peekaboo-tracker
+
+- name: "Install Expander Correlator"
+  hosts: expander_correlator
+  tags: expander-correlator
+  become: true
+  roles:
+    - role: expander-service
+  vars:
+    expander_service: expander-correlator
+
+- name: "Install Expander API"
+  hosts: expander_api
+  tags: expander-api
+  become: true
+  roles:
+    - role: expander-service
+  vars:
+    expander_service: expander-api
+    expander_instances: 0
+
+- name: Clean up installer directory
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Remove temporary storage files of deployed passwords
+      file:
+        state: absent
+        path: "{{ item }}"
+      with_items:
+        - minio_secret_key

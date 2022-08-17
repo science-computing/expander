@@ -14,7 +14,7 @@ __description__ = None
 __author__ = None
 __license__ = None
 with open(os.path.join(
-        here, "extractor", "__init__.py"), encoding="utf-8") as init:
+        here, "expander", "__init__.py"), encoding="utf-8") as init:
     exec(init.read())
 
 # Get the long description from the README file
@@ -36,9 +36,9 @@ for req in all_reqs:
 
     install_requires.append(req.strip())
 
-GITHUB_BASE = "https://github.com/michaelweiser/extractor"
+GITHUB_BASE = "https://github.com/science-computing/expander"
 setuptools.setup(
-    name="extractor",
+    name="expander",
     version=__version__,
     description=__description__,
     long_description=long_description,
@@ -77,10 +77,10 @@ setuptools.setup(
     # directly is discouraged anyway and "only" tucks the files away in the egg
     # directory, providing the most consistent option.
     data_files=[
-        ("share/doc/extractor", [
+        ("share/doc/expander", [
             "README.md",
             "CHANGELOG.md",
-            "docs/extractor.svg",
+            "docs/expander-schematic.svg",
         ]),
     ],
     # overriding the whole install_data command allows for arbitrary
@@ -99,17 +99,17 @@ setuptools.setup(
     author_email="michael.weiser@gmx.de",
     entry_points={
         "console_scripts": [
-            "extractor-api = extractor.api:main",
-            "extractor-deduper = extractor.deduper:ExtractorDeduper.main",
-            "extractor-cache-responder = "
-                "extractor.cache.responder:ExtractorCacheResponder.main",
-            "extractor-peekaboo-submitter = "
-                "extractor.peekaboo.submitter:ExtractorPeekabooSubmitter.main",
-            "extractor-poker = extractor.poker:ExtractorPoker.main",
-            "extractor-peekaboo-tracker = "
-                "extractor.peekaboo.tracker:ExtractorPeekabooTracker.main",
-            "extractor-correlator = "
-                "extractor.correlator:ExtractorCorrelator.main",
+            "expander-api = expander.api:main",
+            "expander-deduper = expander.deduper:ExpanderDeduper.main",
+            "expander-cache-responder = "
+                "expander.cache.responder:ExpanderCacheResponder.main",
+            "expander-peekaboo-submitter = "
+                "expander.peekaboo.submitter:ExpanderPeekabooSubmitter.main",
+            "expander-poker = expander.poker:ExpanderPoker.main",
+            "expander-peekaboo-tracker = "
+                "expander.peekaboo.tracker:ExpanderPeekabooTracker.main",
+            "expander-correlator = "
+                "expander.correlator:ExpanderCorrelator.main",
         ],
     }
 )

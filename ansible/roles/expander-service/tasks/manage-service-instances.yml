@@ -1,0 +1,15 @@
+---
+- name: "Create the {{ expander_service }} systemd service unit"
+  template:
+    src: service.systemd.j2
+    dest: "/etc/systemd/system/{{ expander_service }}@.service"
+    owner: root
+    group: root
+
+- name: "Enable and start {{ expander_service }} instances"
+  systemd:
+    name: "{{ expander_service }}@{{ item }}"
+    state: started
+    enabled: true
+    daemon_reload: yes
+  loop: "{{ range(1, expander_instances + 1, 1) | list }}"

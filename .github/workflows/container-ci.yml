@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Check out repo under $GITHUB_WORKSPACE
-      - name: Check out extractor
+      - name: Check out expander
         uses: actions/checkout@v2
 
       - name: Bring up the environment
@@ -28,7 +28,7 @@ jobs:
       - name: Prepare test job
         run: |
           zip -9r inside.zip README.md docs
-          zip -9r outside.zip extractor inside.zip
+          zip -9r outside.zip expander inside.zip
 
       - name: Wait for API to come up
         run: |

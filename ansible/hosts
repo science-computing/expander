@@ -19,23 +19,23 @@ localhost ansible_connection=local
 [karton_dashboard]
 localhost ansible_connection=local
 
-[extractor_deduper]
+[expander_deduper]
 localhost ansible_connection=local
 
-[extractor_cache_responder]
+[expander_cache_responder]
 localhost ansible_connection=local
 
-[extractor_peekaboo_submitter]
+[expander_peekaboo_submitter]
 localhost ansible_connection=local
 
-[extractor_poker]
+[expander_poker]
 localhost ansible_connection=local
 
-[extractor_peekaboo_tracker]
+[expander_peekaboo_tracker]
 localhost ansible_connection=local
 
-[extractor_correlator]
+[expander_correlator]
 localhost ansible_connection=local
 
-[extractor_api]
+[expander_api]
 localhost ansible_connection=local

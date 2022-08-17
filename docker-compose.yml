@@ -46,53 +46,53 @@ services:
       - "127.0.0.1:5000:5000"
     env_file:
       - docker-compose.env
-  extractor-api:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-api:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
     env_file:
       - docker-compose.env
     ports:
       - "127.0.0.1:8200:8200"
-  extractor-deduper:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-deduper:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
-    entrypoint: /opt/extractor/bin/extractor-deduper
+    entrypoint: /opt/expander/bin/expander-deduper
     env_file:
       - docker-compose.env
-  extractor-cache-responder:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-cache-responder:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
-    entrypoint: /opt/extractor/bin/extractor-cache-responder
+    entrypoint: /opt/expander/bin/expander-cache-responder
     env_file:
       - docker-compose.env
-  extractor-peekaboo-submitter:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-peekaboo-submitter:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
-    entrypoint: /opt/extractor/bin/extractor-peekaboo-submitter
+    entrypoint: /opt/expander/bin/expander-peekaboo-submitter
     env_file:
       - docker-compose.env
-  extractor-poker:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-poker:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
-    entrypoint: /opt/extractor/bin/extractor-poker
+    entrypoint: /opt/expander/bin/expander-poker
     env_file:
       - docker-compose.env
-  extractor-peekaboo-tracker:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-peekaboo-tracker:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
-    entrypoint: /opt/extractor/bin/extractor-peekaboo-tracker
+    entrypoint: /opt/expander/bin/expander-peekaboo-tracker
     env_file:
       - docker-compose.env
-  extractor-correlator:
-    image: ghcr.io/michaelweiser/extractor:main
+  expander-correlator:
+    image: ghcr.io/science-computing/expander:main
     depends_on:
       - karton-logs
-    entrypoint: /opt/extractor/bin/extractor-correlator
+    entrypoint: /opt/expander/bin/expander-correlator
     env_file:
       - docker-compose.env
