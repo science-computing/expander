@@ -32,14 +32,14 @@ class ExpanderAPI:
 
         self.karton = karton.core.Producer(
             karton_config, identity="expander.api")
-        self.use_cache = config.config.getboolean(
+        self.use_cache = config.getboolean(
             "expander", "use_cache", fallback=True)
-        self.use_deduper = config.config.getboolean(
+        self.use_deduper = config.getboolean(
             "expander", "use_deduper", fallback=True)
-        self.reports_key = config.config.get(
+        self.reports_key = config.get(
             "expander", "reports_key", fallback="expander.reports")
-        host = config.config.get("expanderapi", "host", fallback=host)
-        port = config.config.getint("expanderapi", "port", fallback=port)
+        host = config.get("expanderapi", "host", fallback=host)
+        port = config.getint("expanderapi", "port", fallback=port)
 
         # silence sanic to a reasonable amount
         logging.getLogger('sanic.root').setLevel(logging.WARNING)

@@ -33,13 +33,13 @@ services:
       - docker-compose.env
   karton-archive-extractor:
     # no :latest
-    image: certpl/karton-archive-extractor:6c9fd2581a3261c18bc1b0fc3c692231a48fabf9
+    image: certpl/karton-archive-extractor
     depends_on:
       - karton-logs
     env_file:
       - docker-compose.env
   karton-dashboard:
-    image: certpl/karton-dashboard:8f5bdd94bed2ddff2ef4a826f8107a8ec11e8609
+    image: certpl/karton-dashboard
     depends_on:
       - karton-logs
     ports:

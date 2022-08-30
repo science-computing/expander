@@ -2,12 +2,11 @@
 [logging]
 level = {{ karton_log_level }}
 
-[minio]
-access_key = {{ minio_access_key }}
-secret_key = {{ minio_secret_key }}
-address = {{ minio_address }}
-bucket = {{ minio_bucket }}
-secure = {{ minio_secure }}
+[s3]
+access_key = {{ s3_access_key }}
+secret_key = {{ s3_secret_key }}
+address = {{ s3_address }}
+bucket = {{ s3_bucket }}
 
 [redis]
 host={{ redis_host }}

@@ -31,19 +31,19 @@ class ExpanderPeekabooTracker(karton.core.Karton):
                  reports_identity="expander.correlator-for-job-"):
         super().__init__(config=config, identity=identity, backend=backend)
 
-        self.reports_identity = config.config.get(
+        self.reports_identity = config.get(
             "expander", "correlator_reports_identity",
             fallback=reports_identity)
 
-        self.job_age_cutoff = datetime.timedelta(seconds=config.config.getint(
+        self.job_age_cutoff = datetime.timedelta(seconds=config.getint(
             "expanderpeekabootracker", "job_age_cutoff",
             fallback=job_age_cutoff))
 
-        self.url = config.config.get("expanderpeekaboo", "url", fallback=url)
+        self.url = config.get("expanderpeekaboo", "url", fallback=url)
 
-        retries = config.config.getint(
+        retries = config.getint(
             "expanderpeekaboo", "retries", fallback=retries)
-        backoff = config.config.getfloat(
+        backoff = config.getfloat(
             "expanderpeekaboo", "backoff", fallback=backoff)
 
         retry_config = urllib3.util.Retry(

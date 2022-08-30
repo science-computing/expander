@@ -1,4 +1,4 @@
-karton-core
+karton-core>=5.0.0
 requests
 sanic
 schema

@@ -11,7 +11,7 @@ minio_port: 9091
 minio_server_addr: "{{ minio_listen_address }}:{{ minio_port }}"
 
 # karton-service role
-minio_address: "{{ minio_server }}:{{ minio_port }}"
+s3_address: "http://{{ minio_server }}:{{ minio_port }}"
 
 # configure consistent redis port
 # redis role

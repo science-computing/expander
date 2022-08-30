@@ -30,11 +30,11 @@ class ExpanderPeekabooSubmitter(karton.core.Karton):
                  url="http://127.0.0.1:8100", retries=5, backoff=0.5):
         super().__init__(config=config, identity=identity, backend=backend)
 
-        self.url = config.config.get("expanderpeekaboo", "url", fallback=url)
+        self.url = config.get("expanderpeekaboo", "url", fallback=url)
 
-        retries = config.config.getint(
+        retries = config.getint(
             "expanderpeekaboo", "retries", fallback=retries)
-        backoff = config.config.getfloat(
+        backoff = config.getfloat(
             "expanderpeekaboo", "backoff", fallback=backoff)
 
         retry_config = urllib3.util.Retry(

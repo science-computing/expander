@@ -43,12 +43,12 @@ class ExpanderJobCorrelator(karton.core.Consumer):
         # cache key
         self.cache_criteria_key = None
 
-        self.reports_key = config.config.get(
+        self.reports_key = config.get(
             "expander", "reports_key", fallback="expander.reports")
-        self.job_cache_key = config.config.get(
+        self.job_cache_key = config.get(
             "expander", "job_cache_key", fallback="expander.cache:")
 
-        identity = config.config.get(
+        identity = config.get(
             "expander", "correlator_reports_identity",
             fallback="expander.correlator-for-job-") + str(job_id)
 

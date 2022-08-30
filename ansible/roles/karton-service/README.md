@@ -26,11 +26,10 @@ Role Variables
 * karton\_service\_command: "{{ karton\_bindir }}/{{ karton\_command }} --config-file {{ karton\_config\_file }} {{ karton\_extra\_args }}"
 * karton\_instances: 3
 * karton\_log\_level: INFO
-* minio\_access\_key: karton
-* minio\_secret\_key: secret
-* minio\_address: localhost:9000
-* minio\_bucket: karton
-* minio\_secure: 0
+* s3\_access\_key: karton
+* s3\_secret\_key: secret
+* s3\_address: http://localhost:9000
+* s3\_bucket: karton
 * redis\_host: localhost
 * redis\_port: 6379
 

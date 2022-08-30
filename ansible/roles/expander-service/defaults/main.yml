@@ -15,11 +15,10 @@ expander_instances: 3
 
 karton_log_level: INFO
 
-minio_access_key: karton
-minio_secret_key: secret
-minio_address: localhost:9000
-minio_bucket: karton
-minio_secure: 0
+s3_access_key: karton
+s3_secret_key: secret
+s3_address: http://localhost:9000
+s3_bucket: karton
 
 redis_host: localhost
 redis_port: 6379

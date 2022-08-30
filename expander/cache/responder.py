@@ -23,7 +23,7 @@ class ExpanderCacheResponder(karton.core.Karton):
             }
         ]
 
-        if config.config.getboolean("expander", "use_deduper", fallback=True):
+        if config.getboolean("expander", "use_deduper", fallback=True):
             self.filters = [
                 {
                     "type": "expander-sample",
@@ -31,13 +31,13 @@ class ExpanderCacheResponder(karton.core.Karton):
                 }
             ]
 
-        self.age_out_interval = datetime.timedelta(seconds=config.config.getint(
+        self.age_out_interval = datetime.timedelta(seconds=config.getint(
             "expandercacheresponder", "age_out_interval", fallback=60))
-        self.max_age = datetime.timedelta(seconds=config.config.getint(
+        self.max_age = datetime.timedelta(seconds=config.getint(
             "expandercacheresponder", "max_age", fallback=240))
-        self.reports_key = config.config.get(
+        self.reports_key = config.get(
             "expander", "reports_key", fallback="expander.reports")
-        self.job_cache_key = config.config.get(
+        self.job_cache_key = config.get(
             "expander", "job_cache_key", fallback="expander.cache:")
 
         super().__init__(config=config, identity=identity, backend=backend)

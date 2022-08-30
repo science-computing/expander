@@ -38,17 +38,17 @@ class ExpanderPoker(DelayingKarton):
 
     def __init__(self, config=None, identity=None, backend=None,
                  timeout=1, poking_delay=3):
-        self.poking_delay = datetime.timedelta(seconds=config.config.getint(
+        self.poking_delay = datetime.timedelta(seconds=config.getint(
             "expanderpoker", "poking_delay", fallback=poking_delay))
-        timeout = config.config.getint(
+        timeout = config.getint(
             "expanderpoker", "timeout", fallback=timeout)
 
-        self.jobs_key = config.config.get(
+        self.jobs_key = config.get(
             "expander", "jobs_key", fallback="expander.jobs")
 
         # 60 seconds should be way enough for all race-conditions to resolve
         # themselves
-        self.recheck_cutoff = datetime.timedelta(seconds=config.config.getint(
+        self.recheck_cutoff = datetime.timedelta(seconds=config.getint(
             "expanderpoker", "cutoff", fallback=60))
 
         super().__init__(

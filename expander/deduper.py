@@ -38,22 +38,22 @@ class ExpanderDeduper(DelayingKarton):
             "kind": "raw",
         }
 
-        if config.config.getboolean("expander", "use_cache", fallback=True):
+        if config.getboolean("expander", "use_cache", fallback=True):
             self.deduped_headers = {
                 "type": "expander-sample",
                 "state": "deduped",
             }
 
         # give up deduping after ten minutes
-        self.cutoff = datetime.timedelta(seconds=config.config.getint(
+        self.cutoff = datetime.timedelta(seconds=config.getint(
             "expanderdeduper", "cutoff", fallback=600))
-        self.gc_interval = datetime.timedelta(seconds=config.config.getint(
+        self.gc_interval = datetime.timedelta(seconds=config.getint(
             "expanderdeduper", "gc_interval",
             fallback=2*self.cutoff.total_seconds()))
 
-        self.running_key = config.config.get(
+        self.running_key = config.get(
             "expanderdeduper", "running_key", fallback="expander.running")
-        self.reports_key = config.config.get(
+        self.reports_key = config.get(
             "expander", "reports_key", fallback="expander.reports")
 
         # re-check delayed dupes every other second.
@@ -62,7 +62,7 @@ class ExpanderDeduper(DelayingKarton):
         # sources quickly.  Multiple instances of the deduper will
         # statistically increase the checking frequency and increase load on
         # redis. But they'd do so in any case.
-        timeout = config.config.getint(
+        timeout = config.getint(
             "expanderdeduper", "recheck_interval", fallback=timeout)
 
         super().__init__(
