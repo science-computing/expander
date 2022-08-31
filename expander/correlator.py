@@ -1,5 +1,6 @@
 """ A Karton that correlates job reports into a summary report. """
 
+import contextlib
 import datetime
 import hashlib
 import json
@@ -52,13 +53,14 @@ class ExpanderJobCorrelator(karton.core.Consumer):
             "expander", "correlator_reports_identity",
             fallback="expander.correlator-for-job-") + str(job_id)
 
-        # avoid GracefulKiller from KartonServiceBase
-        super(karton.core.base.KartonServiceBase, self).__init__(
-            config=config, identity=identity, backend=backend)
-        self.current_task = None
-        self.setup_logger()
-        self._pre_hooks = []
-        self._post_hooks = []
+        super().__init__(config=config, identity=identity, backend=backend)
+
+    @contextlib.contextmanager
+    def graceful_killer(self):
+        """ A no-op graceful_killer to avoid conflicting duplicated signal
+        handler installation since this job correlator consumer will shut down
+        after the current correlator run is finished anyway. """
+        yield
 
     def process(self, task: karton.core.Task) -> None:
         peekaboo_job_id = task.get_payload("peekaboo-job-id")
