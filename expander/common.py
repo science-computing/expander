@@ -190,7 +190,7 @@ class DelayingKarton(karton.core.Karton):
         bind_redis.client_setname(self.sync_identity)
         bind_redises.append(bind_redis)
 
-        try:
+        with self.graceful_killer():
             last_switch = datetime.datetime.now(datetime.timezone.utc)
             timeoutdelta = datetime.timedelta(seconds=self.timeout)
             while not self.shutdown:
@@ -260,8 +260,4 @@ class DelayingKarton(karton.core.Karton):
 
                     self.internal_process(task)
 
-        except KeyboardInterrupt as e:
-            self.log.info("Hard shutting down!")
-            raise e
-        finally:
-            self.backend.unregister_bind(self.sync_identity)
+        self.backend.unregister_bind(self.sync_identity)
