@@ -1,6 +1,6 @@
 ---
-minio_secret_key: "{{ lookup('password',
-  'minio_secret_key length=15 chars=ascii_letters') }}"
+s3_secret_key: "{{ lookup('password',
+  's3_secret_key length=15 chars=ascii_letters') }}"
 
 # configure consistent minio port
 minio_server: "localhost"
