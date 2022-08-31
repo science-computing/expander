@@ -38,8 +38,8 @@ class DelayedTask(karton.core.Task):
 
 
 class DelayingKartonBackend(karton.core.backend.KartonBackend):
-    def __init__(self, config, sync_identity=None):
-        super().__init__(config)
+    def __init__(self, config, identity=None, sync_identity=None):
+        super().__init__(config, identity=identity)
         self.delay_filters = None
         self.delay_identity = None
         self.sync_identity = sync_identity
@@ -96,8 +96,12 @@ class DelayingKarton(karton.core.Karton):
 
         # inject our delaying backend by default
         if backend is None:
+            # if identity is not passed via constructor get it from class
+            if identity is None:
+                identity = self.identity
+
             backend = DelayingKartonBackend(
-                config, sync_identity=self.sync_identity)
+                config, identity=identity, sync_identity=self.sync_identity)
 
         super().__init__(config=config, identity=identity, backend=backend)
 
@@ -150,8 +154,6 @@ class DelayingKarton(karton.core.Karton):
         for task_filter in self.filters:
             self.log.info("Binding on: %s", task_filter)
 
-        self.backend.set_consumer_identity(self.identity)
-
         # MOD1: add additional identities for delaying tasks
         bind_redises = []
         for delay_queue in self.delay_queues:
@@ -172,8 +174,7 @@ class DelayingKarton(karton.core.Karton):
 
             # create and keep around another redis connection to get us listed
             # as online consumer
-            bind_redis = self.backend.make_redis(self.config)
-            bind_redis.client_setname(identity)
+            bind_redis = self.backend.make_redis(self.config, identity=identity)
             bind_redises.append(bind_redis)
 
         # MOD4: add additional identity for syncing delayers
@@ -186,8 +187,8 @@ class DelayingKarton(karton.core.Karton):
             persistent=True,
             service_version=self.__class__.version)
         self.backend.register_bind(bind)
-        bind_redis = self.backend.make_redis(self.config)
-        bind_redis.client_setname(self.sync_identity)
+        bind_redis = self.backend.make_redis(
+            self.config, identity=self.sync_identity)
         bind_redises.append(bind_redis)
 
         with self.graceful_killer():
@@ -197,6 +198,10 @@ class DelayingKarton(karton.core.Karton):
                 if self.backend.get_bind(self.identity) != self._bind:
                     self.log.info("Binds changed, shutting down.")
                     break
+
+                # keep our secondary bind connections online
+                for bind_redis in bind_redises:
+                    bind_redis.ping()
 
                 # MOD2: provide shorter timeout to task dequeue
                 task = self.backend.consume_routed_task(

@@ -27,7 +27,7 @@ class ExpanderJobCorrelator(karton.core.Consumer):
     """ expander job correlator """
     version = __version__
 
-    def __init__(self, job_id, config=None, backend=None):
+    def __init__(self, job_id, config=None):
         self.job_id = job_id
 
         # read instead of class members
@@ -52,6 +52,11 @@ class ExpanderJobCorrelator(karton.core.Consumer):
         identity = config.get(
             "expander", "correlator_reports_identity",
             fallback="expander.correlator-for-job-") + str(job_id)
+
+        # we need to create a new backend for each correlation because its
+        # static identity value determines whether the consumer is listed
+        # as online
+        backend = NonBlockingKartonBackend(config, identity=identity)
 
         super().__init__(config=config, identity=identity, backend=backend)
 
@@ -103,7 +108,6 @@ class ExpanderJobCorrelator(karton.core.Consumer):
         tasks
         """
         self.backend.register_bind(self._bind)
-        self.backend.set_consumer_identity(self.identity)
 
         while True:
             task = self.backend.consume_routed_task(self.identity)
@@ -183,18 +187,13 @@ class ExpanderCorrelator(karton.core.Consumer):
         }
     ]
 
-    def __init__(self, config=None, identity=None, backend=None):
-        self.non_blocking_backend = NonBlockingKartonBackend(config)
-        super().__init__(config=config, identity=identity, backend=backend)
-
     def process(self, task: karton.core.Task) -> None:
         self.log.info("%s: Got poked to look at expander job", task.root_uid)
 
         # spawn a job-specific consumer. Because we're doing it because of a
         # trigger task from the poker, we can be sure we're the only ones doing
         # that.
-        job_correlator = ExpanderJobCorrelator(
-            task.root_uid, self.config, self.non_blocking_backend)
+        job_correlator = ExpanderJobCorrelator(task.root_uid, self.config)
         job_correlator.correlate()
 
 
