@@ -43,8 +43,9 @@ class ExpanderPeekabooTracker(karton.core.Karton):
 
         retries = config.getint(
             "expanderpeekaboo", "retries", fallback=retries)
-        backoff = config.getfloat(
-            "expanderpeekaboo", "backoff", fallback=backoff)
+        # no getfloat in karton Config (yet)
+        backoff = float(config.get(
+            "expanderpeekaboo", "backoff", fallback=backoff))
 
         retry_config = urllib3.util.Retry(
             total=retries, backoff_factor=backoff,
