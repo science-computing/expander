@@ -2,6 +2,11 @@
 
 See documentation for details.
 
+## 0.0.3
+
+- Fix installation from distribution
+- Fix long description format
+
 ## 0.0.2
 
 - Support and require Karton 5.0.0
