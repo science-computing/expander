@@ -42,6 +42,7 @@ setuptools.setup(
     version=__version__,
     description=__description__,
     long_description=long_description,
+    long_description_content_type="text/markdown",
     url=f"{GITHUB_BASE}.git",
     download_url=f"{GITHUB_BASE}/archive/master.zip",
     license=__license__,
