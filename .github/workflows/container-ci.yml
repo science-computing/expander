@@ -17,7 +17,7 @@ jobs:
     steps:
       # Check out repo under $GITHUB_WORKSPACE
       - name: Check out expander
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Bring up the environment
         run: |
