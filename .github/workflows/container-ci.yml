@@ -21,7 +21,7 @@ jobs:
 
       - name: Bring up the environment
         run: |
-          docker-compose -f docker-compose.yml -f docker-compose.dev.yml \
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
             up --build --detach
 
       # curl and jq are preinstalled on Github ubuntu-latest runner
@@ -64,8 +64,8 @@ jobs:
 
       - name: Get logs
         if: always()
-        run: docker-compose logs
+        run: docker compose logs
 
       - name: Bring down the environment
         if: always()
-        run: docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml down
