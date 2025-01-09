@@ -133,7 +133,7 @@ class ExpanderCacheResponder(karton.core.Karton):
         self.send_task(classifier_task)
         self.log.info(
             "%s: No cache match on %s - passed on (%s)",
-            task.root_uid, criteria_key, task.uid)
+            task.root_uid, criteria_key, task.task_uid)
 
 
 if __name__ == "__main__":

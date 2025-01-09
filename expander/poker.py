@@ -58,7 +58,7 @@ class ExpanderPoker(DelayingKarton):
         state = task.headers.get("state")
         if state is None:
             self.log.warning(
-                "Ignoring task %s without state: %s", task.uid, task.headers)
+                "Ignoring task %s without state: %s", task.task_uid, task.headers)
             return
 
         headers = {
@@ -85,7 +85,7 @@ class ExpanderPoker(DelayingKarton):
             self.send_task(tracker_task)
             self.log.info(
                 "%s:%s: Initially poked job tracker (%s)",
-                task.root_uid, task.uid, tracker_task.uid)
+                task.root_uid, task.task_uid, tracker_task.task_uid)
             return
 
         if state == "delayed":
@@ -93,7 +93,7 @@ class ExpanderPoker(DelayingKarton):
             if last_string is None:
                 self.log.warning(
                     "%s:%s: Ignoring delayed task we've apparently "
-                    "never seen before", task.root_uid, task.uid)
+                    "never seen before", task.root_uid, task.task_uid)
                 return
 
             last = datetime.datetime.fromisoformat(last_string)
@@ -106,7 +106,7 @@ class ExpanderPoker(DelayingKarton):
                 headers["state"] = "delayed"
                 self.log.info(
                     "%s:%s: Poking delay not yet expired, %s to go",
-                    task.root_uid, task.uid, poke_time - now)
+                    task.root_uid, task.task_uid, poke_time - now)
 
                 # do not update last-poke payload, so it expires
             else:
@@ -117,7 +117,7 @@ class ExpanderPoker(DelayingKarton):
 
                 self.log.info(
                     "%s:%s: Poking job tracker",
-                    task.root_uid, task.uid)
+                    task.root_uid, task.task_uid)
 
             task = task.derive_task(headers)
             self.send_task(task)
@@ -129,7 +129,7 @@ class ExpanderPoker(DelayingKarton):
                 # do not spam the log on rechecks
                 self.log.info(
                     "%s:%s: Removed task from tracking",
-                    task.root_uid, task.uid)
+                    task.root_uid, task.task_uid)
 
             # NOTE: we consider this an atomic operation which is preventing us
             # from producing multiple correlator pokes
@@ -149,7 +149,7 @@ class ExpanderPoker(DelayingKarton):
                 self.log.debug(
                     "%s:%s: Job count went negative through race with "
                     "colleague (%d) - refraining from poking the correlator "
-                    "again", task.root_uid, task.uid, jobs_left)
+                    "again", task.root_uid, task.task_uid, jobs_left)
                 self.backend.redis.hdel(self.jobs_key, task.root_uid)
                 return
 
@@ -203,7 +203,7 @@ class ExpanderPoker(DelayingKarton):
                 if recheck_start + self.recheck_cutoff < now:
                     self.log.warning(
                         "%s: Lingering task %s is blocking correlation.",
-                        task.root_uid, other_task.uid)
+                        task.root_uid, other_task.task_uid)
 
                     if (other_task.status ==
                             karton.core.task.TaskState.SPAWNED):
@@ -216,7 +216,7 @@ class ExpanderPoker(DelayingKarton):
                 else:
                     self.log.info(
                         "%s: More jobs appear to be coming: %s",
-                        task.root_uid, other_task.uid)
+                        task.root_uid, other_task.task_uid)
 
                 # there are race conditions between a submitter sending the
                 # peekaboo-job task to us (and us having processed it) and
@@ -251,12 +251,12 @@ class ExpanderPoker(DelayingKarton):
 
             self.log.info(
                 "%s: Poked correlator (%s)",
-                task.root_uid, task.uid)
+                task.root_uid, task.task_uid)
             return
 
         self.log.warning(
             "%s:%s: Ignoring task with unknown state %s",
-            task.root_uid, task.uid, state)
+            task.root_uid, task.task_uid, state)
 
 
 if __name__ == "__main__":

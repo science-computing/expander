@@ -135,7 +135,7 @@ class ExpanderPeekabooTracker(karton.core.Karton):
                     self.send_task(delay_task)
                     self.log.info(
                         "%s:%s: Told poker that it needs more tracking (%s)",
-                        task.root_uid, peekaboo_job_id, delay_task.uid)
+                        task.root_uid, peekaboo_job_id, delay_task.task_uid)
                     return
 
                 reason = f"Tracking Peekaboo job failed: {error}"
@@ -158,7 +158,7 @@ class ExpanderPeekabooTracker(karton.core.Karton):
         self.send_task(done_task)
         self.log.info(
             "%s:%s: Told poker that it's done (%s)",
-            task.root_uid, peekaboo_job_id, done_task.uid)
+            task.root_uid, peekaboo_job_id, done_task.task_uid)
 
         # register a persistent queue for this expander job (if there isn't one
         # already) where to park the job reports until all jobs are done
@@ -197,7 +197,7 @@ class ExpanderPeekabooTracker(karton.core.Karton):
         self.send_task(report_task)
         self.log.info(
             "%s:%s: Submitted report (%s)",
-            task.root_uid, peekaboo_job_id, report_task.uid)
+            task.root_uid, peekaboo_job_id, report_task.task_uid)
 
         # do not do lengthy processing down here because it aggravates a race
         # condition with the all-jobs-finished check in the poker
