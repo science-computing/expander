@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   expander-dummy-peekaboo-api:
     image: expander-dummy-peekaboo-api
