@@ -157,7 +157,7 @@ class ExpanderDeduper(DelayingKarton):
             self.send_task(task)
             self.log.info(
                 "%s: No new status on dedupe hold - looping though (%s)",
-                task.root_uid, task.uid)
+                task.root_uid, task.task_uid)
             return
 
         if task_type != "expander-sample":
@@ -165,7 +165,7 @@ class ExpanderDeduper(DelayingKarton):
             self.send_task(task)
             self.log.warning(
                 "%s: Passing on task %s with unknown type: %s",
-                task.root_uid, task.uid, task_type)
+                task.root_uid, task.task_uid, task_type)
             return
 
         state = task.headers.get("state")
@@ -174,7 +174,7 @@ class ExpanderDeduper(DelayingKarton):
             self.send_task(task)
             self.log.warning(
                 "%s: Passing on task %s without state: %s",
-                task.root_uid, task.uid, task.headers)
+                task.root_uid, task.task_uid, task.headers)
             return
 
         sample = task.get_resource("sample")
@@ -223,7 +223,7 @@ class ExpanderDeduper(DelayingKarton):
                 self.send_task(task)
                 self.log.info(
                     "%s: Task is no dupe - passing on (%s)",
-                    task.root_uid, task.uid)
+                    task.root_uid, task.task_uid)
 
                 # poke ourselves to check if it finished so we can unblock held
                 # duplicates
@@ -245,7 +245,7 @@ class ExpanderDeduper(DelayingKarton):
             self.send_task(task)
             self.log.info(
                 "%s: Task is dupe but colliding job ID seems to have finished "
-                "- passing on (%s)", task.root_uid, task.uid)
+                "- passing on (%s)", task.root_uid, task.task_uid)
             return
 
         # report should provide cache hit (but will not for failed jobs - could
@@ -255,7 +255,7 @@ class ExpanderDeduper(DelayingKarton):
             self.send_task(task)
             self.log.info(
                 "%s: Task is dupe but colliding job %s is finished - passing "
-                "on (%s)", task.root_uid, job_id, task.uid)
+                "on (%s)", task.root_uid, job_id, task.task_uid)
             return
 
         since_string = task.get_payload("dedupe-held-since")
@@ -272,7 +272,7 @@ class ExpanderDeduper(DelayingKarton):
             self.log.info(
                 "%s: Task is dupe but colliding job %s has been blocking it "
                 "for %s now - passing on (%s)", task.root_uid, job_id,
-                now - since, task.uid)
+                now - since, task.task_uid)
             return
 
         task = task.derive_task({
@@ -282,7 +282,7 @@ class ExpanderDeduper(DelayingKarton):
         })
         self.send_task(task)
         self.log.info(
-            "%s: Task is dupe - delaying (%s)", task.root_uid, task.uid)
+            "%s: Task is dupe - delaying (%s)", task.root_uid, task.task_uid)
 
 
 if __name__ == "__main__":

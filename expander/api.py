@@ -278,11 +278,12 @@ class ExpanderAPI:
             task.add_payload("content-disposition", content_disposition)
 
         self.karton.send_task(task)
+        job_id = task.task_uid
 
-        logger.debug('%s: Sent to Karton as job %s', task.uid, task.uid)
+        logger.debug('%s: Sent to Karton as job %s', job_id, job_id)
 
         # send answer to client
-        return sanic.response.json({'job_id': task.uid}, 200)
+        return sanic.response.json({'job_id': job_id}, 200)
 
     async def report(self, _, job_id):
         """ report endpoint for report retrieval by job ID
