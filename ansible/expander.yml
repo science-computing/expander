@@ -3,12 +3,12 @@
   tags: minio
   become: true
   roles:
-    - role: atosatto.minio
+    - role: ricsanfre.minio
   vars:
     minio_server_datadirs:
       - "/var/lib/minio"
-    minio_access_key: "karton"
-    minio_secret_key: "{{ s3_secret_key }}"
+    minio_root_user: "karton"
+    minio_root_password: "{{ s3_secret_key }}"
 
 - name: "Install redis"
   hosts: redis

@@ -8,7 +8,8 @@ minio_listen_address: "127.0.0.1"
 minio_port: 9091
 
 # minio role
-minio_server_addr: "{{ minio_listen_address }}:{{ minio_port }}"
+minio_server_addr: "{{ minio_listen_address }}"
+minio_server_port: "{{ minio_port }}"
 
 # karton-service role
 s3_address: "http://{{ minio_server }}:{{ minio_port }}"
