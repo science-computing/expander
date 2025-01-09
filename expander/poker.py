@@ -5,6 +5,7 @@ import sys
 
 import karton
 import karton.core
+import karton.core.inspect
 import karton.core.task
 
 from . import __version__
@@ -156,25 +157,23 @@ class ExpanderPoker(DelayingKarton):
             if jobs_left != 0:
                 return
 
-            # make sure no more jobs are coming. This is quite an expensive
-            # operation because we need to look at all tasks.
-            all_tasks = self.backend.get_all_tasks()
-            for other_task in all_tasks:
+            # make sure no more jobs are coming. get_analysis() of recent
+            # Karton is much cheaper than get_all_tasks().
+            state = karton.core.inspect.KartonState(self.backend)
+
+            # pending_tasks already ignores crashed tasks
+            # NOTE: We ignore crashed tasks because they may not
+            # belong to our part of the pipeline and our getting to
+            # this point makes it extremely unlikely that it does.
+            for other_task in state.get_analysis(task.root_uid).pending_tasks:
                 if other_task.uid == task.uid:
                     # ignore ourselves
                     continue
 
-                if other_task.root_uid != task.root_uid:
-                    # ignore tasks with different root id
-                    continue
-
-                if other_task.status in [
-                        karton.core.task.TaskState.FINISHED,
-                        karton.core.task.TaskState.CRASHED]:
-                    # ignore finished and crashed tasks
-                    # NOTE: We ignore crashed tasks because they may not
-                    # belong to our part of the pipeline and our getting to
-                    # this point makes it extremely unlikely that it does.
+                if other_task.status == karton.core.task.TaskState.FINISHED:
+                    # ignore finished tasks. Would be removed by karton-system
+                    # eventually but ignoring them here speeds up the decision
+                    # making.
                     continue
 
                 if other_task.headers.get("type") in [
